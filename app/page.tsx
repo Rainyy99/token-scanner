@@ -48,7 +48,6 @@ export default function Home() {
           <input
             value={chainId}
             onChange={(e) => setChainId(e.target.value)}
-            placeholder="e.g. 1, 4663"
           />
         </div>
         <div style={{ marginTop: 8 }}>
