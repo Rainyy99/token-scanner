@@ -9,7 +9,7 @@ type ScanResponse = {
 };
 
 export default function Home() {
-  const [chainId, setChainId] = useState("4663");
+  const [chainId, setChainId] = useState("");
   const [address, setAddress] = useState("");
   const [pastedCode, setPastedCode] = useState("");
   const [loading, setLoading] = useState(false);
@@ -45,7 +45,11 @@ export default function Home() {
         <div>
           <label>Chain ID</label>
           <br />
-          <input value={chainId} onChange={(e) => setChainId(e.target.value)} />
+          <input
+            value={chainId}
+            onChange={(e) => setChainId(e.target.value)}
+            placeholder="e.g. 1, 4663"
+          />
         </div>
         <div style={{ marginTop: 8 }}>
           <label>Token address</label>
