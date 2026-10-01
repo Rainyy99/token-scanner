@@ -1,26 +1,38 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef } from "react";
 
-type ScanResponse = {
-  result?: unknown;
-  error?: string;
-  message?: string;
-};
+type PollResult =
+  | { status: "pending"; statusName?: string }
+  | { status: "failed"; reason: string; detail: string }
+  | { status: "done"; result: unknown };
 
 export default function Home() {
   const [chainId, setChainId] = useState("");
   const [address, setAddress] = useState("");
   const [pastedCode, setPastedCode] = useState("");
-  const [loading, setLoading] = useState(false);
-  const [response, setResponse] = useState<ScanResponse | null>(null);
+  const [phase, setPhase] = useState<"idle" | "submitting" | "polling" | "done" | "error">("idle");
+  const [message, setMessage] = useState<string>("");
+  const [result, setResult] = useState<unknown>(null);
+  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  function stopPolling() {
+    if (pollRef.current) {
+      clearInterval(pollRef.current);
+      pollRef.current = null;
+    }
+  }
 
   async function handleScan(e: React.FormEvent) {
     e.preventDefault();
-    setLoading(true);
-    setResponse(null);
+    stopPolling();
+    setResult(null);
+    setPhase("submitting");
+    setMessage("Submitting scan...");
+
+    let txHash: string;
     try {
-      const res = await fetch("/api/scan", {
+      const res = await fetch("/api/scan/submit", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -29,13 +41,49 @@ export default function Home() {
           pastedCode: pastedCode.trim() === "" ? undefined : pastedCode,
         }),
       });
-      const data: ScanResponse = await res.json();
-      setResponse(data);
+      const data = await res.json();
+      if (!res.ok || !data.txHash) {
+        setPhase("error");
+        setMessage(data.message || "Failed to submit scan.");
+        return;
+      }
+      txHash = data.txHash;
     } catch (err) {
-      setResponse({ error: "network_error", message: String(err) });
-    } finally {
-      setLoading(false);
+      setPhase("error");
+      setMessage(String(err));
+      return;
     }
+
+    setPhase("polling");
+    setMessage("Waiting for validator consensus...");
+
+    pollRef.current = setInterval(async () => {
+      try {
+        const res = await fetch(
+          `/api/scan/status?hash=${txHash}&chainId=${Number(chainId)}&address=${address}`
+        );
+        const data: PollResult = await res.json();
+
+        if (data.status === "pending") {
+          setMessage("Waiting for validator consensus" + (data.statusName ? ` (${data.statusName})` : "..."));
+          return;
+        }
+        stopPolling();
+        if (data.status === "failed") {
+          setPhase("error");
+          setMessage(data.detail);
+          return;
+        }
+        if (data.status === "done") {
+          setPhase("done");
+          setResult(data.result);
+        }
+      } catch (err) {
+        stopPolling();
+        setPhase("error");
+        setMessage(String(err));
+      }
+    }, 3000);
   }
 
   return (
@@ -45,10 +93,7 @@ export default function Home() {
         <div>
           <label>Chain ID</label>
           <br />
-          <input
-            value={chainId}
-            onChange={(e) => setChainId(e.target.value)}
-          />
+          <input value={chainId} onChange={(e) => setChainId(e.target.value)} />
         </div>
         <div style={{ marginTop: 8 }}>
           <label>Token address</label>
@@ -70,14 +115,18 @@ export default function Home() {
             style={{ width: "100%" }}
           />
         </div>
-        <button type="submit" disabled={loading} style={{ marginTop: 12 }}>
-          {loading ? "Scanning..." : "Scan"}
+        <button type="submit" disabled={phase === "submitting" || phase === "polling"} style={{ marginTop: 12 }}>
+          {phase === "submitting" || phase === "polling" ? "Scanning..." : "Scan"}
         </button>
       </form>
 
-      {response && (
+      {message && (phase === "submitting" || phase === "polling" || phase === "error") && (
+        <p style={{ marginTop: 16, color: phase === "error" ? "red" : undefined }}>{message}</p>
+      )}
+
+      {phase === "done" && result !== null && (
         <pre style={{ marginTop: 24, whiteSpace: "pre-wrap", background: "#111", color: "#0f0", padding: 12 }}>
-          {JSON.stringify(response, null, 2)}
+          {JSON.stringify(result, null, 2)}
         </pre>
       )}
     </main>

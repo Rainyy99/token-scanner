@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { runScanToken, runScanPastedCode, getScan } from "@/lib/genlayer";
+import { submitScanToken, submitScanPastedCode } from "@/lib/genlayer";
 import { checkRateLimit } from "@/lib/rateLimit";
 
 const ADDRESS_RE = /^0x[a-fA-F0-9]{40}$/;
@@ -49,43 +49,14 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  const runResult =
+  const result =
     pastedCode && pastedCode.trim() !== ""
-      ? await runScanPastedCode(chainId, address, pastedCode)
-      : await runScanToken(chainId, address);
+      ? await submitScanPastedCode(chainId, address, pastedCode)
+      : await submitScanToken(chainId, address);
 
-  if (!runResult.ok) {
-    const statusMap: Record<string, number> = {
-      undetermined: 503,
-      execution_error: 502,
-      timeout: 504,
-      config_error: 500,
-    };
-    return NextResponse.json(
-      { error: runResult.reason, message: runResult.detail },
-      { status: statusMap[runResult.reason] ?? 500 }
-    );
+  if (!result.ok) {
+    return NextResponse.json({ error: result.reason, message: result.detail }, { status: 500 });
   }
 
-  let scanJson: string;
-  try {
-    scanJson = await getScan(chainId, address);
-  } catch (e) {
-    return NextResponse.json(
-      { error: "read_failed", message: "Scan completed but reading the result failed: " + String(e) },
-      { status: 500 }
-    );
-  }
-
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(scanJson);
-  } catch {
-    return NextResponse.json(
-      { error: "parse_failed", message: "Could not parse scan result from the contract." },
-      { status: 500 }
-    );
-  }
-
-  return NextResponse.json({ result: parsed });
+  return NextResponse.json({ txHash: result.txHash });
 }

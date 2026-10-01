@@ -17,22 +17,19 @@ function getReadClient() {
   return createClient({ chain: studionet });
 }
 
-export type ScanRunResult =
-  | { ok: true }
-  | {
-      ok: false;
-      reason: "undetermined" | "execution_error" | "timeout" | "config_error";
-      detail: string;
-    };
+// ---- Submit (fast, does not wait for consensus) ----
 
-async function runWrite(
+export type SubmitResult =
+  | { ok: true; txHash: string }
+  | { ok: false; reason: "config_error"; detail: string };
+
+async function submitWrite(
   functionName: "scan_token" | "scan_pasted_code",
   args: unknown[]
-): Promise<ScanRunResult> {
+): Promise<SubmitResult> {
   if (!CONTRACT_ADDRESS) {
     return { ok: false, reason: "config_error", detail: "CONTRACT_ADDRESS is not set" };
   }
-
   let client;
   try {
     client = getOperatorClient();
@@ -47,66 +44,94 @@ async function runWrite(
     value: 0n,
   });
 
-  let receipt;
+  return { ok: true, txHash: txHash as string };
+}
+
+export async function submitScanToken(chainId: number, address: string): Promise<SubmitResult> {
+  return submitWrite("scan_token", [chainId, address]);
+}
+
+export async function submitScanPastedCode(
+  chainId: number,
+  address: string,
+  pastedCode: string
+): Promise<SubmitResult> {
+  return submitWrite("scan_pasted_code", [chainId, address, pastedCode]);
+}
+
+// ---- Status check (single, non-blocking check — meant to be polled) ----
+
+export type StatusResult =
+  | { status: "pending"; statusName?: string }
+  | { status: "failed"; reason: "undetermined" | "execution_error" | string; detail: string }
+  | { status: "done"; result: unknown };
+
+export async function checkScanStatus(
+  txHash: string,
+  chainId: number,
+  address: string
+): Promise<StatusResult> {
+  const client = getReadClient();
+
+  let tx;
   try {
-    receipt = await client.waitForTransactionReceipt({
-      hash: txHash,
-      status: TransactionStatus.FINALIZED,
-      retries: 40,
-      interval: 3000,
-    });
+    tx = await client.getTransaction({ hash: txHash as never });
   } catch (e) {
-    return { ok: false, reason: "timeout", detail: String(e) };
+    // Transaction not found yet (e.g. not yet indexed) — treat as still pending.
+    return { status: "pending", statusName: "not_found_yet: " + String(e) };
   }
 
-  const statusName = receipt.statusName;
+  const statusName = tx.statusName;
 
-  if (statusName && !DECIDED_STATES.includes(statusName)) {
-    return {
-      ok: false,
-      reason: "timeout",
-      detail: "Transaction did not reach a final state: " + statusName,
-    };
+  if (!statusName || !DECIDED_STATES.includes(statusName)) {
+    return { status: "pending", statusName };
   }
+
   if (statusName === TransactionStatus.UNDETERMINED) {
     return {
-      ok: false,
+      status: "failed",
       reason: "undetermined",
       detail: "Validators could not reach consensus on this scan. Please try again.",
     };
   }
-  if (receipt.txExecutionResultName === "FINISHED_WITH_ERROR") {
+
+  if (statusName !== TransactionStatus.ACCEPTED && statusName !== TransactionStatus.FINALIZED) {
     return {
-      ok: false,
+      status: "failed",
+      reason: statusName,
+      detail: "Transaction ended in state: " + statusName,
+    };
+  }
+
+  if (tx.txExecutionResultName === "FINISHED_WITH_ERROR") {
+    return {
+      status: "failed",
       reason: "execution_error",
       detail: "Contract execution failed.",
     };
   }
 
-  return { ok: true };
-}
-
-export async function runScanToken(chainId: number, address: string): Promise<ScanRunResult> {
-  return runWrite("scan_token", [chainId, address]);
-}
-
-export async function runScanPastedCode(
-  chainId: number,
-  address: string,
-  pastedCode: string
-): Promise<ScanRunResult> {
-  return runWrite("scan_pasted_code", [chainId, address, pastedCode]);
-}
-
-export async function getScan(chainId: number, address: string): Promise<string> {
+  // ACCEPTED or FINALIZED with a successful execution result: read the scan.
   if (!CONTRACT_ADDRESS) {
-    throw new Error("CONTRACT_ADDRESS is not set");
+    return { status: "failed", reason: "config_error", detail: "CONTRACT_ADDRESS is not set" };
   }
-  const client = getReadClient();
-  const result = await client.readContract({
-    address: CONTRACT_ADDRESS,
-    functionName: "get_scan",
-    args: [chainId, address],
-  });
-  return result as string;
+  let scanJson: string;
+  try {
+    scanJson = (await client.readContract({
+      address: CONTRACT_ADDRESS,
+      functionName: "get_scan",
+      args: [chainId, address],
+    })) as string;
+  } catch (e) {
+    return { status: "failed", reason: "read_failed", detail: String(e) };
+  }
+
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(scanJson);
+  } catch {
+    return { status: "failed", reason: "parse_failed", detail: "Could not parse scan result." };
+  }
+
+  return { status: "done", result: parsed };
 }
