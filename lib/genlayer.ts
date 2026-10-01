@@ -42,6 +42,7 @@ async function submitWrite(
     functionName,
     args: args as never,
     value: 0n,
+    consensusMaxRotations: 8,
   });
 
   return { ok: true, txHash: txHash as string };
@@ -77,7 +78,6 @@ export async function checkScanStatus(
   try {
     tx = await client.getTransaction({ hash: txHash as never });
   } catch (e) {
-    // Transaction not found yet (e.g. not yet indexed) — treat as still pending.
     return { status: "pending", statusName: "not_found_yet: " + String(e) };
   }
 
@@ -111,7 +111,6 @@ export async function checkScanStatus(
     };
   }
 
-  // ACCEPTED or FINALIZED with a successful execution result: read the scan.
   if (!CONTRACT_ADDRESS) {
     return { status: "failed", reason: "config_error", detail: "CONTRACT_ADDRESS is not set" };
   }
