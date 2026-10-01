@@ -42,7 +42,6 @@ async function submitWrite(
     functionName,
     args: args as never,
     value: 0n,
-    consensusMaxRotations: 8,
   });
 
   return { ok: true, txHash: txHash as string };
