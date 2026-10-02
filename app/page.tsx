@@ -7,6 +7,46 @@ type PollResult =
   | { status: "failed"; reason: string; detail: string }
   | { status: "done"; result: unknown };
 
+type StoredScan = { txHash: string; submittedAt: number };
+
+const STALE_MS = 15 * 60 * 1000; // 15 minutes
+
+function scanKey(chainId: number, address: string): string {
+  return `scan:${chainId}:${address.toLowerCase()}`;
+}
+
+function getStoredScan(chainId: number, address: string): StoredScan | null {
+  try {
+    const raw = localStorage.getItem(scanKey(chainId, address));
+    if (!raw) return null;
+    const parsed: StoredScan = JSON.parse(raw);
+    if (Date.now() - parsed.submittedAt > STALE_MS) {
+      localStorage.removeItem(scanKey(chainId, address));
+      return null;
+    }
+    return parsed;
+  } catch {
+    return null;
+  }
+}
+
+function setStoredScan(chainId: number, address: string, txHash: string) {
+  try {
+    const entry: StoredScan = { txHash, submittedAt: Date.now() };
+    localStorage.setItem(scanKey(chainId, address), JSON.stringify(entry));
+  } catch {
+    // localStorage unavailable (e.g. private mode) — dedup just won't work, non-fatal.
+  }
+}
+
+function clearStoredScan(chainId: number, address: string) {
+  try {
+    localStorage.removeItem(scanKey(chainId, address));
+  } catch {
+    // ignore
+  }
+}
+
 export default function Home() {
   const [chainId, setChainId] = useState("");
   const [address, setAddress] = useState("");
@@ -23,10 +63,55 @@ export default function Home() {
     }
   }
 
+  function startPolling(txHash: string, chainIdNum: number, addr: string) {
+    setPhase("polling");
+    setMessage("Waiting for validator consensus...");
+
+    pollRef.current = setInterval(async () => {
+      try {
+        const res = await fetch(`/api/scan/status?hash=${txHash}&chainId=${chainIdNum}&address=${addr}`);
+        const data: PollResult = await res.json();
+
+        if (data.status === "pending") {
+          setMessage("Waiting for validator consensus" + (data.statusName ? ` (${data.statusName})` : "..."));
+          return;
+        }
+        stopPolling();
+        clearStoredScan(chainIdNum, addr);
+        if (data.status === "failed") {
+          setPhase("error");
+          setMessage(data.detail);
+          return;
+        }
+        if (data.status === "done") {
+          setPhase("done");
+          setResult(data.result);
+        }
+      } catch (err) {
+        stopPolling();
+        clearStoredScan(chainIdNum, addr);
+        setPhase("error");
+        setMessage(String(err));
+      }
+    }, 3000);
+  }
+
   async function handleScan(e: React.FormEvent) {
     e.preventDefault();
     stopPolling();
     setResult(null);
+
+    const chainIdNum = Number(chainId);
+
+    // If a scan for this exact token is already in flight (e.g. the user
+    // refreshed the page and clicked Scan again), resume polling it
+    // instead of submitting a brand new transaction.
+    const existing = getStoredScan(chainIdNum, address);
+    if (existing) {
+      startPolling(existing.txHash, chainIdNum, address);
+      return;
+    }
+
     setPhase("submitting");
     setMessage("Submitting scan...");
 
@@ -36,7 +121,7 @@ export default function Home() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          chainId: Number(chainId),
+          chainId: chainIdNum,
           address,
           pastedCode: pastedCode.trim() === "" ? undefined : pastedCode,
         }),
@@ -54,36 +139,8 @@ export default function Home() {
       return;
     }
 
-    setPhase("polling");
-    setMessage("Waiting for validator consensus...");
-
-    pollRef.current = setInterval(async () => {
-      try {
-        const res = await fetch(
-          `/api/scan/status?hash=${txHash}&chainId=${Number(chainId)}&address=${address}`
-        );
-        const data: PollResult = await res.json();
-
-        if (data.status === "pending") {
-          setMessage("Waiting for validator consensus" + (data.statusName ? ` (${data.statusName})` : "..."));
-          return;
-        }
-        stopPolling();
-        if (data.status === "failed") {
-          setPhase("error");
-          setMessage(data.detail);
-          return;
-        }
-        if (data.status === "done") {
-          setPhase("done");
-          setResult(data.result);
-        }
-      } catch (err) {
-        stopPolling();
-        setPhase("error");
-        setMessage(String(err));
-      }
-    }, 3000);
+    setStoredScan(chainIdNum, address, txHash);
+    startPolling(txHash, chainIdNum, address);
   }
 
   return (
