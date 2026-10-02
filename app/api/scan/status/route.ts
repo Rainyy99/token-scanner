@@ -22,5 +22,6 @@ export async function GET(req: NextRequest) {
   }
 
   const result = await checkScanStatus(txHash, chainId, address);
+  console.log("[scan/status]", txHash, JSON.stringify(result));
   return NextResponse.json(result);
 }
