@@ -188,6 +188,11 @@ export default function Home() {
         </button>
       </form>
 
+      <p style={{ marginTop: 12, fontSize: 13, opacity: 0.7 }}>
+        Note: large, multi-file or proxy contracts can take longer and sometimes fail validator consensus.
+        If that happens, paste the contract&apos;s source code directly.
+      </p>
+
       {message && (phase === "submitting" || phase === "polling" || phase === "error") && (
         <p style={{ marginTop: 16, color: phase === "error" ? "red" : undefined }}>{message}</p>
       )}
