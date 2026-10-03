@@ -87,7 +87,11 @@ export default function Home() {
         clearStoredScan(chainIdNum, addr);
         if (data.status === "failed") {
           setPhase("error");
-          setMessage(data.detail);
+          setMessage(
+            data.reason === "undetermined"
+              ? "Validators could not reach consensus on this scan. This is more common with large or proxy contracts. Try again, or paste the contract's source code directly in the field above."
+              : data.detail
+          );
           return;
         }
         if (data.status === "done") {
