@@ -66,6 +66,7 @@ export default function Home() {
   function startPolling(txHash: string, chainIdNum: number, addr: string) {
     setPhase("polling");
     setMessage("Waiting for validator consensus...");
+    const startedAt = Date.now();
 
     pollRef.current = setInterval(async () => {
       try {
@@ -73,7 +74,13 @@ export default function Home() {
         const data: PollResult = await res.json();
 
         if (data.status === "pending") {
-          setMessage("Waiting for validator consensus" + (data.statusName ? ` (${data.statusName})` : "..."));
+          if (Date.now() - startedAt > 75000) {
+            setMessage(
+              "Still working. Large, multi-file or proxy contracts take longer and are more likely to fail validator consensus."
+            );
+          } else {
+            setMessage("Waiting for validator consensus" + (data.statusName ? ` (${data.statusName})` : "..."));
+          }
           return;
         }
         stopPolling();
