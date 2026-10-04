@@ -23,6 +23,7 @@
 .rc-tone-brass { --tone: #b8832e; --on: #16181c; }
 .rc-tone-green { --tone: #2e6b55; --on: #f4f0e6; }
 .rc-tone-grey { --tone: #5b5e66; --on: #f4f0e6; }
+.rc-tone-steel { --tone: #3f6682; --on: #f4f0e6; }
 
 .rc-eyebrow {
   margin: 0;
@@ -235,3 +236,12 @@
   white-space: pre-wrap;
   word-break: break-word;
 }
+
+.rc-access {
+  margin: 6px 0 0;
+  padding-left: 8px;
+  border-left: 3px solid var(--rc-line);
+  font-size: 12px;
+}
+.rc-access-open { border-left-color: #b23a2e; color: #e6a79f; }
+.rc-access-gated { border-left-color: #3f6682; color: #9fbad0; }

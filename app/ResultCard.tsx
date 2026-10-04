@@ -1,6 +1,6 @@
 import "./result-card.css";
 
-type Tone = "red" | "brass" | "green" | "grey";
+type Tone = "red" | "brass" | "green" | "grey" | "steel";
 
 type Finding = { answer?: string; function?: string; reason?: string };
 
@@ -21,6 +21,9 @@ export type ScanResult = {
     functions_total?: number;
     functions_public_nonview?: number;
     flags?: Record<string, number>;
+    open_fns?: string[];
+    gated_fns?: string[];
+    pause_ctrl?: string[];
     map_truncated?: boolean;
     snippets_truncated?: boolean;
   } | null;
@@ -28,6 +31,36 @@ export type ScanResult = {
 };
 
 const VERDICTS: Record<string, { label: string; tone: Tone; summary: string }> = {
+  DANGER: {
+    label: "Danger",
+    tone: "red",
+    summary:
+      "At least one high-impact capability can be used by anyone, with no access restriction found in the code. Treat this token as unsafe unless you can explain why.",
+  },
+  CENTRALIZED: {
+    label: "Centralized",
+    tone: "steel",
+    summary:
+      "Several privileged powers exist, but the code restricts them to specific accounts. This is common in issuer-managed tokens such as stablecoins and is not a sign of a scam on its own. Holders still have to trust whoever holds these powers.",
+  },
+  CAUTION: {
+    label: "Caution",
+    tone: "brass",
+    summary:
+      "One privileged capability was found, and the code restricts it to specific accounts. Review it below before relying on this token.",
+  },
+  CLEAR: {
+    label: "Clear",
+    tone: "green",
+    summary:
+      "None of the five checked capabilities was found in the code that was analyzed. This is not a guarantee of safety.",
+  },
+  UNVERIFIED: {
+    label: "Unverified",
+    tone: "red",
+    summary:
+      "No verified source code was found, so this contract's behavior cannot be reviewed. Treat that as a risk signal on its own.",
+  },
   BAHAYA: {
     label: "Danger",
     tone: "red",
@@ -67,8 +100,8 @@ const VERDICTS: Record<string, { label: string; tone: Tone; summary: string }> =
 const CATEGORIES: Array<{ key: string; title: string; meaning: string }> = [
   {
     key: "unrestricted_mint",
-    title: "Unrestricted minting",
-    meaning: "Whether a privileged address can create new tokens with no visible cap, diluting every holder.",
+    title: "Minting power",
+    meaning: "Whether some address can create new tokens, diluting every holder. The access line below says who is allowed to do it.",
   },
   {
     key: "blacklist_or_freeze",
@@ -103,6 +136,21 @@ function shortAddr(addr?: string): string {
   if (!addr) return "unknown address";
   if (addr.length <= 18) return addr;
   return addr.slice(0, 8) + "…" + addr.slice(-6);
+}
+
+function accessOf(cat: string, f: Finding, review: ScanResult["review"]): "open" | "gated" | null {
+  if (!review) return null;
+  const open = review.open_fns || [];
+  const gated = review.gated_fns || [];
+  if (cat === "pause_transfers") {
+    const ctrl = review.pause_ctrl || [];
+    if (ctrl.length === 0) return null;
+    return ctrl.some((c) => open.includes(c)) ? "open" : "gated";
+  }
+  if (!f.function) return null;
+  if (open.includes(f.function)) return "open";
+  if (gated.includes(f.function)) return "gated";
+  return null;
 }
 
 function asFinding(value: unknown): Finding | null {
@@ -219,6 +267,13 @@ export default function ResultCard({ result }: { result: ScanResult }) {
                     </p>
                   ) : null}
                   {f.reason ? <p className="rc-reason">{f.reason}</p> : null}
+                  {(() => {
+                    if ((f.answer || "").toUpperCase() !== "YES") return null;
+                    const acc = accessOf(c.key, f, review);
+                    if (acc === "open") return <p className="rc-access rc-access-open">No access restriction found on this function.</p>;
+                    if (acc === "gated") return <p className="rc-access rc-access-gated">Restricted to specific accounts (role or owner check).</p>;
+                    return null;
+                  })()}
                   <p className="rc-meaning">{c.meaning}</p>
                 </li>
               );
