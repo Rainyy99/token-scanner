@@ -2,6 +2,7 @@
 
 import { useState, useRef } from "react";
 import ResultCard, { type ScanResult } from "./ResultCard";
+import { POPULAR_CHAINS, chainLabel, type ChainOption } from "@/lib/chains";
 
 type PollResult =
   | { status: "pending"; statusName?: string }
@@ -11,6 +12,7 @@ type PollResult =
 type StoredScan = { txHash: string; submittedAt: number };
 
 const STALE_MS = 15 * 60 * 1000; // 15 minutes
+const ADDRESS_RE = /^0x[a-fA-F0-9]{40}$/;
 
 function scanKey(chainId: number, address: string): string {
   return `scan:${chainId}:${address.toLowerCase()}`;
@@ -49,12 +51,15 @@ function clearStoredScan(chainId: number, address: string) {
 }
 
 export default function Home() {
-  const [chainId, setChainId] = useState("");
+  const [chainSel, setChainSel] = useState("auto"); // "auto" | chain id | "other"
+  const [customChain, setCustomChain] = useState("");
   const [address, setAddress] = useState("");
   const [pastedCode, setPastedCode] = useState("");
-  const [phase, setPhase] = useState<"idle" | "submitting" | "polling" | "done" | "error">("idle");
+  const [phase, setPhase] = useState<"idle" | "detecting" | "choose" | "submitting" | "polling" | "done" | "error">("idle");
   const [message, setMessage] = useState<string>("");
   const [result, setResult] = useState<unknown>(null);
+  const [picker, setPicker] = useState<ChainOption[] | null>(null);
+  const [alsoOn, setAlsoOn] = useState<ChainOption[]>([]);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   function stopPolling() {
@@ -108,12 +113,9 @@ export default function Home() {
     }, 3000);
   }
 
-  async function handleScan(e: React.FormEvent) {
-    e.preventDefault();
-    stopPolling();
-    setResult(null);
-
-    const chainIdNum = Number(chainId);
+  async function runScan(chainIdNum: number, others: ChainOption[]) {
+    setPicker(null);
+    setAlsoOn(others);
 
     // If a scan for this exact token is already in flight (e.g. the user
     // refreshed the page and clicked Scan again), resume polling it
@@ -155,14 +157,115 @@ export default function Home() {
     startPolling(txHash, chainIdNum, address);
   }
 
+  async function handleScan(e: React.FormEvent) {
+    e.preventDefault();
+    stopPolling();
+    setResult(null);
+    setPicker(null);
+    setAlsoOn([]);
+
+    const addr = address.trim();
+    if (!ADDRESS_RE.test(addr)) {
+      setPhase("error");
+      setMessage("Enter a valid token address (0x followed by 40 hex characters).");
+      return;
+    }
+    if (addr !== address) setAddress(addr);
+
+    // Chain picked by hand: scan it directly.
+    if (chainSel !== "auto") {
+      const idNum = chainSel === "other" ? Number(customChain) : Number(chainSel);
+      if (!Number.isInteger(idNum) || idNum <= 0) {
+        setPhase("error");
+        setMessage("Enter a valid chain ID (a positive whole number).");
+        return;
+      }
+      await runScan(idNum, []);
+      return;
+    }
+
+    // Auto-detect: ask Sourcify where this address is verified.
+    setPhase("detecting");
+    setMessage("Detecting chain...");
+    let found: ChainOption[] = [];
+    try {
+      const res = await fetch(`/api/chains?address=${addr}`);
+      const data = await res.json();
+      if (!res.ok) {
+        setPhase("error");
+        setMessage("Could not detect the chain right now. Pick a chain from the list and try again.");
+        return;
+      }
+      found = Array.isArray(data.chains) ? data.chains : [];
+    } catch {
+      setPhase("error");
+      setMessage("Could not detect the chain right now. Pick a chain from the list and try again.");
+      return;
+    }
+
+    if (found.length === 0) {
+      setPhase("error");
+      setMessage(
+        pastedCode.trim() === ""
+          ? "No verified source found for this address on any chain. Pick a chain from the list, or paste the source code."
+          : "Chain not detected. Pick the chain this contract is on, then scan again."
+      );
+      return;
+    }
+    if (found.length === 1) {
+      await runScan(found[0].id, []);
+      return;
+    }
+    setPicker(found);
+    setPhase("choose");
+    setMessage("");
+  }
+
+  async function chooseChain(c: ChainOption) {
+    stopPolling();
+    await runScan(
+      c.id,
+      (picker || []).filter((x) => x.id !== c.id)
+    );
+  }
+
+  const busy = phase === "detecting" || phase === "submitting" || phase === "polling";
+
   return (
     <main style={{ maxWidth: 640, margin: "0 auto", padding: 24, fontFamily: "monospace" }}>
       <h1>Token Security Scanner</h1>
       <form onSubmit={handleScan}>
         <div>
-          <label>Chain ID</label>
+          <label htmlFor="chain">
+            Chain <span style={{ opacity: 0.6 }}>(optional)</span>
+          </label>
           <br />
-          <input value={chainId} onChange={(e) => setChainId(e.target.value)} />
+          <select
+            id="chain"
+            value={chainSel}
+            onChange={(e) => setChainSel(e.target.value)}
+            style={{ width: "100%" }}
+          >
+            <option value="auto">Auto-detect (recommended)</option>
+            {POPULAR_CHAINS.map((c) => (
+              <option key={c.id} value={String(c.id)}>
+                {c.name} · {c.id}
+              </option>
+            ))}
+            <option value="other">Other (enter chain ID)…</option>
+          </select>
+          {chainSel === "other" && (
+            <input
+              value={customChain}
+              onChange={(e) => setCustomChain(e.target.value)}
+              inputMode="numeric"
+              placeholder="Chain ID, e.g. 59144"
+              style={{ width: "100%", marginTop: 6 }}
+            />
+          )}
+          <div style={{ fontSize: 12, opacity: 0.65, marginTop: 4 }}>
+            Leave on Auto-detect and just paste the token address.
+          </div>
         </div>
         <div style={{ marginTop: 8 }}>
           <label>Token address</label>
@@ -184,8 +287,8 @@ export default function Home() {
             style={{ width: "100%" }}
           />
         </div>
-        <button type="submit" disabled={phase === "submitting" || phase === "polling"} style={{ marginTop: 12 }}>
-          {phase === "submitting" || phase === "polling" ? "Scanning..." : "Scan"}
+        <button type="submit" disabled={busy} style={{ marginTop: 12 }}>
+          {busy ? "Scanning..." : "Scan"}
         </button>
       </form>
 
@@ -194,12 +297,25 @@ export default function Home() {
         If that happens, paste the contract&apos;s source code directly.
       </p>
 
-      {message && (phase === "submitting" || phase === "polling" || phase === "error") && (
+      {phase === "choose" && picker && (
+        <div style={{ marginTop: 16 }}>
+          <p>This address is verified on several chains. Which one do you want to scan?</p>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+            {picker.map((c) => (
+              <button key={c.id} type="button" onClick={() => chooseChain(c)}>
+                {chainLabel(c.id)}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {message && (phase === "detecting" || phase === "submitting" || phase === "polling" || phase === "error") && (
         <p style={{ marginTop: 16, color: phase === "error" ? "red" : undefined }}>{message}</p>
       )}
 
       {phase === "done" && result !== null && (
-        <ResultCard result={result as ScanResult} />
+        <ResultCard result={result as ScanResult} alsoOn={alsoOn} />
       )}
     </main>
   );

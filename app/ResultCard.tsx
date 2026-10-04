@@ -1,4 +1,5 @@
 import "./result-card.css";
+import { chainLabel } from "@/lib/chains";
 
 type Tone = "red" | "brass" | "green" | "grey" | "steel";
 
@@ -173,7 +174,13 @@ function statusOf(answer?: string): { text: string; tone: Tone } {
   return { text: "Unclear", tone: "grey" };
 }
 
-export default function ResultCard({ result }: { result: ScanResult }) {
+export default function ResultCard({
+  result,
+  alsoOn,
+}: {
+  result: ScanResult;
+  alsoOn?: { id: number; name: string }[];
+}) {
   const verdictKey = result.verdict || "";
   const meta = VERDICTS[verdictKey] || {
     label: verdictKey || "Unknown",
@@ -198,7 +205,8 @@ export default function ResultCard({ result }: { result: ScanResult }) {
     : "";
 
   const facts: Array<[string, string]> = [];
-  if (result.chain_id !== undefined) facts.push(["Chain", String(result.chain_id)]);
+  if (result.chain_id !== undefined) facts.push(["Chain", chainLabel(result.chain_id)]);
+  if (alsoOn && alsoOn.length > 0) facts.push(["Also verified on", alsoOn.map((c) => chainLabel(c.id)).join(", ")]);
   facts.push([
     "Source",
     result.source === "pasted" ? "Pasted code" : result.verified ? "Verified on Sourcify" : "No verified source",
@@ -225,7 +233,7 @@ export default function ResultCard({ result }: { result: ScanResult }) {
     <section className={"rc-card rc-tone-" + meta.tone} aria-label="Scan result">
       <div className="rc-head">
         <div>
-          <p className="rc-eyebrow">Case file</p>
+          <p className="rc-eyebrow">Case file{result.chain_id !== undefined ? " · " + chainLabel(result.chain_id) : ""}</p>
           <p className="rc-subject">
             <span className="rc-nowrap" title={result.input_address}>
               {shortAddr(result.input_address)}
