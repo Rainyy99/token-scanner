@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useRef } from "react";
+import ResultCard, { type ScanResult } from "./ResultCard";
 
 type PollResult =
   | { status: "pending"; statusName?: string }
@@ -198,9 +199,7 @@ export default function Home() {
       )}
 
       {phase === "done" && result !== null && (
-        <pre style={{ marginTop: 24, whiteSpace: "pre-wrap", background: "#111", color: "#0f0", padding: 12 }}>
-          {JSON.stringify(result, null, 2)}
-        </pre>
+        <ResultCard result={result as ScanResult} />
       )}
     </main>
   );
