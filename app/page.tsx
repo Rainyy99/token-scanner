@@ -232,19 +232,39 @@ export default function Home() {
   const busy = phase === "detecting" || phase === "submitting" || phase === "polling";
 
   return (
-    <main style={{ maxWidth: 640, margin: "0 auto", padding: 24, fontFamily: "monospace" }}>
-      <h1>Token Security Scanner</h1>
-      <form onSubmit={handleScan}>
-        <div>
-          <label htmlFor="chain">
-            Chain <span style={{ opacity: 0.6 }}>(optional)</span>
+    <main className="ts-page">
+      <h1 className="ts-title">Token Security Scanner</h1>
+      <p className="ts-lede">
+        Paste a token address. Reviewers read its verified source code and report which powers
+        its owner holds: minting, freezing, pausing and upgrading.
+      </p>
+
+      <form className="ts-form" onSubmit={handleScan}>
+        <div className="ts-field">
+          <label className="ts-label" htmlFor="address">
+            Token address
           </label>
-          <br />
+          <input
+            id="address"
+            className="ts-input"
+            value={address}
+            onChange={(e) => setAddress(e.target.value)}
+            placeholder="0x..."
+            autoComplete="off"
+            autoCapitalize="off"
+            spellCheck={false}
+          />
+        </div>
+
+        <div className="ts-field">
+          <label className="ts-label" htmlFor="chain">
+            Chain <span>(optional)</span>
+          </label>
           <select
             id="chain"
+            className="ts-select"
             value={chainSel}
             onChange={(e) => setChainSel(e.target.value)}
-            style={{ width: "100%" }}
           >
             <option value="auto">Auto-detect (recommended)</option>
             {POPULAR_CHAINS.map((c) => (
@@ -256,53 +276,47 @@ export default function Home() {
           </select>
           {chainSel === "other" && (
             <input
+              className="ts-input"
               value={customChain}
               onChange={(e) => setCustomChain(e.target.value)}
               inputMode="numeric"
               placeholder="Chain ID, e.g. 59144"
-              style={{ width: "100%", marginTop: 6 }}
+              aria-label="Chain ID"
             />
           )}
-          <div style={{ fontSize: 12, opacity: 0.65, marginTop: 4 }}>
-            Leave on Auto-detect and just paste the token address.
-          </div>
+          <p className="ts-hint">Leave on Auto-detect and the scanner finds the chain from the address.</p>
         </div>
-        <div style={{ marginTop: 8 }}>
-          <label>Token address</label>
-          <br />
-          <input
-            value={address}
-            onChange={(e) => setAddress(e.target.value)}
-            placeholder="0x..."
-            style={{ width: "100%" }}
-          />
-        </div>
-        <div style={{ marginTop: 8 }}>
-          <label>Pasted source code (optional)</label>
-          <br />
+
+        <div className="ts-field">
+          <label className="ts-label" htmlFor="code">
+            Source code <span>(optional)</span>
+          </label>
           <textarea
+            id="code"
+            className="ts-textarea"
             value={pastedCode}
             onChange={(e) => setPastedCode(e.target.value)}
-            rows={6}
-            style={{ width: "100%" }}
+            placeholder="Only needed if the contract is not verified on Sourcify."
+            spellCheck={false}
           />
         </div>
-        <button type="submit" disabled={busy} style={{ marginTop: 12 }}>
-          {busy ? "Scanning..." : "Scan"}
+
+        <button type="submit" className="ts-submit" disabled={busy}>
+          {busy ? "Scanning..." : "Scan token"}
         </button>
+
+        <p className="ts-note">
+          Large, multi-file or proxy contracts take longer and sometimes fail validator consensus.
+          If that happens, paste the contract&apos;s source code directly.
+        </p>
       </form>
 
-      <p style={{ marginTop: 12, fontSize: 13, opacity: 0.7 }}>
-        Note: large, multi-file or proxy contracts can take longer and sometimes fail validator consensus.
-        If that happens, paste the contract&apos;s source code directly.
-      </p>
-
       {phase === "choose" && picker && (
-        <div style={{ marginTop: 16 }}>
+        <div className="ts-choose">
           <p>This address is verified on several chains. Which one do you want to scan?</p>
-          <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+          <div className="ts-chips">
             {picker.map((c) => (
-              <button key={c.id} type="button" onClick={() => chooseChain(c)}>
+              <button key={c.id} type="button" className="ts-chip" onClick={() => chooseChain(c)}>
                 {chainLabel(c.id)}
               </button>
             ))}
@@ -310,8 +324,21 @@ export default function Home() {
         </div>
       )}
 
-      {message && (phase === "detecting" || phase === "submitting" || phase === "polling" || phase === "error") && (
-        <p style={{ marginTop: 16, color: phase === "error" ? "red" : undefined }}>{message}</p>
+      {message && (phase === "detecting" || phase === "submitting" || phase === "polling") && (
+        <p className="ts-status" role="status">
+          <span className="ts-dots" aria-hidden="true">
+            <i />
+            <i />
+            <i />
+          </span>
+          {message}
+        </p>
+      )}
+
+      {message && phase === "error" && (
+        <p className="ts-error" role="alert">
+          {message}
+        </p>
       )}
 
       {phase === "done" && result !== null && (
