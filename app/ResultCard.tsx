@@ -24,6 +24,8 @@ export type ScanResult = {
     open_fns?: string[];
     gated_fns?: string[];
     pause_ctrl?: string[];
+    access?: Record<string, string>;
+    access_fns?: Record<string, string[]>;
     map_truncated?: boolean;
     snippets_truncated?: boolean;
   } | null;
@@ -41,13 +43,13 @@ const VERDICTS: Record<string, { label: string; tone: Tone; summary: string }> =
     label: "Centralized",
     tone: "steel",
     summary:
-      "Several privileged powers exist, but the code restricts them to specific accounts. This is common in issuer-managed tokens such as stablecoins and is not a sign of a scam on its own. Holders still have to trust whoever holds these powers.",
+      "Several privileged powers exist, and no open access to them was found in the code. Where the code shows it, they are restricted to specific accounts. This is common in issuer-managed tokens such as stablecoins and is not a sign of a scam on its own. Holders still have to trust whoever holds these powers.",
   },
   CAUTION: {
     label: "Caution",
     tone: "brass",
     summary:
-      "One privileged capability was found, and the code restricts it to specific accounts. Review it below before relying on this token.",
+      "One privileged capability was found, with no open access to it in the code. Review it below before relying on this token.",
   },
   CLEAR: {
     label: "Clear",
@@ -138,8 +140,14 @@ function shortAddr(addr?: string): string {
   return addr.slice(0, 8) + "…" + addr.slice(-6);
 }
 
-function accessOf(cat: string, f: Finding, review: ScanResult["review"]): "open" | "gated" | null {
+function accessOf(cat: string, f: Finding, review: ScanResult["review"]): "open" | "gated" | "unknown" | null {
   if (!review) return null;
+  if (review.access) {
+    const a = review.access[cat];
+    if (a === "open") return "open";
+    if (a === "gated") return "gated";
+    return "unknown";
+  }
   const open = review.open_fns || [];
   const gated = review.gated_fns || [];
   if (cat === "pause_transfers") {
@@ -270,8 +278,10 @@ export default function ResultCard({ result }: { result: ScanResult }) {
                   {(() => {
                     if ((f.answer || "").toUpperCase() !== "YES") return null;
                     const acc = accessOf(c.key, f, review);
-                    if (acc === "open") return <p className="rc-access rc-access-open">No access restriction found on this function.</p>;
+                    const names = ((review && review.access_fns && review.access_fns[c.key]) || []).join(", ");
+                    if (acc === "open") return <p className="rc-access rc-access-open">{names ? "No access restriction found on: " + names + "." : "No access restriction found on this function."}</p>;
                     if (acc === "gated") return <p className="rc-access rc-access-gated">Restricted to specific accounts (role or owner check).</p>;
+                    if (acc === "unknown") return <p className="rc-access">Who can use this could not be determined from the code.</p>;
                     return null;
                   })()}
                   <p className="rc-meaning">{c.meaning}</p>
