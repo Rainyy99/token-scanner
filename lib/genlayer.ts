@@ -133,3 +133,29 @@ export async function checkScanStatus(
 
   return { status: "done", result: parsed };
 }
+
+// ---- History (recent scans, shared by all visitors) ----
+
+export type HistoryEntry = { chain_id: number; address: string; verdict: string; source: string };
+
+export async function getRecentScans(limit = 10): Promise<HistoryEntry[]> {
+  if (!CONTRACT_ADDRESS) return [];
+  const raw = (await getReadClient().readContract({
+    address: CONTRACT_ADDRESS,
+    functionName: "get_recent_scans",
+    args: [limit],
+  })) as string;
+  const parsed = JSON.parse(raw);
+  return Array.isArray(parsed) ? parsed : [];
+}
+
+export async function getStoredScanResult(chainId: number, address: string): Promise<unknown | null> {
+  if (!CONTRACT_ADDRESS) return null;
+  const raw = (await getReadClient().readContract({
+    address: CONTRACT_ADDRESS,
+    functionName: "get_scan",
+    args: [chainId, address],
+  })) as string;
+  const parsed = JSON.parse(raw);
+  return parsed && typeof parsed === "object" && Object.keys(parsed).length > 0 ? parsed : null;
+}

@@ -244,3 +244,51 @@ body {
   .ts-page { padding-top: 48px; }
   .ts-form { padding: 24px 24px 26px; }
 }
+
+.ts-history { margin-top: 32px; }
+
+.ts-history-title {
+  margin: 0 0 6px;
+  font-family: var(--ts-serif);
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--ts-mute);
+}
+
+.ts-history-list { margin: 0; padding: 0; list-style: none; border-top: 1px solid var(--ts-line); }
+
+.ts-history-row {
+  display: grid;
+  grid-template-columns: 92px 1fr;
+  grid-template-areas: "v a" "v c";
+  column-gap: 12px;
+  align-items: center;
+  width: 100%;
+  padding: 10px 2px;
+  background: transparent;
+  color: var(--ts-ink);
+  font: inherit;
+  text-align: left;
+  border: 0;
+  border-bottom: 1px solid var(--ts-line);
+  cursor: pointer;
+  transition: background-color 0.15s ease;
+}
+
+.ts-history-row:hover:not(:disabled) { background: rgba(232, 228, 218, 0.05); }
+.ts-history-row:disabled { cursor: progress; opacity: 0.6; }
+.ts-history-row:focus-visible { outline: 2px solid var(--ts-ink); outline-offset: -2px; }
+
+.ts-history-verdict {
+  grid-area: v;
+  justify-self: start;
+  padding: 3px 8px;
+  font-family: var(--ts-serif);
+  font-size: 12px;
+  font-weight: 700;
+  color: #f4f0e6;
+  border-radius: 2px;
+}
+
+.ts-history-addr { grid-area: a; font-size: 12.5px; }
+.ts-history-chain { grid-area: c; font-size: 11px; color: var(--ts-mute); }

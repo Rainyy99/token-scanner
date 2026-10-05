@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import ResultCard, { type ScanResult } from "./ResultCard";
 import { POPULAR_CHAINS, chainLabel, type ChainOption } from "@/lib/chains";
 
@@ -10,6 +10,18 @@ type PollResult =
   | { status: "done"; result: unknown };
 
 type StoredScan = { txHash: string; submittedAt: number };
+type HistoryItem = { chain_id: number; address: string; verdict: string; source: string };
+
+const VERDICT_COLOR: Record<string, string> = {
+  DANGER: "#b23a2e",
+  CENTRALIZED: "#3f6682",
+  CAUTION: "#b8832e",
+  CLEAR: "#2e6b55",
+};
+
+function shortAddr(a: string): string {
+  return a.length > 14 ? a.slice(0, 6) + "…" + a.slice(-4) : a;
+}
 
 const STALE_MS = 15 * 60 * 1000; // 15 minutes
 const ADDRESS_RE = /^0x[a-fA-F0-9]{40}$/;
@@ -61,6 +73,51 @@ export default function Home() {
   const [picker, setPicker] = useState<ChainOption[] | null>(null);
   const [alsoOn, setAlsoOn] = useState<ChainOption[]>([]);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const resultRef = useRef<HTMLDivElement | null>(null);
+  const [history, setHistory] = useState<HistoryItem[]>([]);
+
+  async function loadHistory() {
+    try {
+      const res = await fetch("/api/history");
+      const data = await res.json();
+      setHistory(Array.isArray(data.scans) ? data.scans : []);
+    } catch {
+      // history is optional; ignore failures
+    }
+  }
+
+  useEffect(() => {
+    loadHistory();
+  }, []);
+
+  useEffect(() => {
+    if (phase === "done" && resultRef.current) {
+      resultRef.current.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+  }, [phase, result]);
+
+  async function openHistory(item: HistoryItem) {
+    stopPolling();
+    setPicker(null);
+    setAlsoOn([]);
+    setResult(null);
+    setPhase("detecting");
+    setMessage("Opening saved scan...");
+    try {
+      const res = await fetch(`/api/history?chainId=${item.chain_id}&address=${item.address}`);
+      const data = await res.json();
+      if (!res.ok || !data.result) {
+        setPhase("error");
+        setMessage(data.message || "Could not load this scan.");
+        return;
+      }
+      setResult(data.result);
+      setPhase("done");
+    } catch (err) {
+      setPhase("error");
+      setMessage(String(err));
+    }
+  }
 
   function stopPolling() {
     if (pollRef.current) {
@@ -103,6 +160,7 @@ export default function Home() {
         if (data.status === "done") {
           setPhase("done");
           setResult(data.result);
+          loadHistory();
         }
       } catch (err) {
         stopPolling();
@@ -341,8 +399,32 @@ export default function Home() {
         </p>
       )}
 
-      {phase === "done" && result !== null && (
-        <ResultCard result={result as ScanResult} alsoOn={alsoOn} />
+      <div ref={resultRef}>
+        {phase === "done" && result !== null && (
+          <ResultCard result={result as ScanResult} alsoOn={alsoOn} />
+        )}
+      </div>
+
+      {history.length > 0 && (
+        <section className="ts-history" aria-label="Recent scans">
+          <h2 className="ts-history-title">Recent scans</h2>
+          <ul className="ts-history-list">
+            {history.map((h) => (
+              <li key={h.chain_id + ":" + h.address.toLowerCase()}>
+                <button type="button" className="ts-history-row" onClick={() => openHistory(h)} disabled={busy}>
+                  <span
+                    className="ts-history-verdict"
+                    style={{ background: VERDICT_COLOR[h.verdict] || "#5b5e66" }}
+                  >
+                    {h.verdict === "UNVERIFIED" ? "Unverified" : h.verdict.charAt(0) + h.verdict.slice(1).toLowerCase()}
+                  </span>
+                  <span className="ts-history-addr">{shortAddr(h.address)}</span>
+                  <span className="ts-history-chain">{chainLabel(h.chain_id)}</span>
+                </button>
+              </li>
+            ))}
+          </ul>
+        </section>
       )}
     </main>
   );
