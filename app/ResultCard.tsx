@@ -104,7 +104,7 @@ const CATEGORIES: Array<{ key: string; title: string; meaning: string }> = [
   {
     key: "unrestricted_mint",
     title: "Minting power",
-    meaning: "Whether some address can create new tokens, diluting every holder. The access line below says who is allowed to do it.",
+    meaning: "Whether some address can create new tokens, diluting every holder. The access note above says who is allowed to do it.",
   },
   {
     key: "blacklist_or_freeze",
