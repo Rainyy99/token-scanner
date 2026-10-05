@@ -8,13 +8,13 @@
   --rc-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
 
   margin-top: 24px;
-  padding: 20px 18px 22px;
+  padding: 16px 14px 18px;
   background: var(--rc-bg);
   color: var(--rc-ink);
-  border: 1px solid var(--rc-line);
+  border: 1px solid var(--tone, var(--rc-line));
   border-radius: 4px;
   font-family: var(--rc-mono);
-  font-size: 14px;
+  font-size: 12.5px;
   line-height: 1.55;
   overflow-wrap: anywhere;
 }
@@ -63,7 +63,7 @@
   color: var(--on);
   font-family: var(--rc-serif);
   font-weight: 700;
-  font-size: 20px;
+  font-size: 17px;
   letter-spacing: 0.08em;
   text-transform: uppercase;
   text-align: center;
@@ -86,9 +86,9 @@
 }
 
 .rc-summary {
-  margin: 18px 0 0;
+  margin: 16px 0 0;
   font-family: var(--rc-serif);
-  font-size: 17px;
+  font-size: 15px;
   line-height: 1.5;
 }
 
@@ -105,10 +105,9 @@
   margin: 26px 0 0;
   padding: 0;
   font-family: var(--rc-serif);
-  font-size: 13px;
+  font-size: 14px;
   font-weight: 700;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
+  letter-spacing: 0;
   color: var(--rc-mute);
 }
 
@@ -136,7 +135,7 @@
 
 .rc-finding-title {
   font-family: var(--rc-serif);
-  font-size: 16px;
+  font-size: 14.5px;
   font-weight: 700;
 }
 
