@@ -2,7 +2,7 @@
 
 Paste an EVM token address or a Solana token mint. GenLayer validators read the contract, check who holds the supply and how established the token is, and file one case report. The report never says a token is "safe".
 
-Built on [GenLayer](https://www.genlayer.com): an intelligent contract does the analysis, and a Next.js app on Vercel is the front end.
+Built on [GenLayer](https://www.genlayer.com): an intelligent contract (`contracts/`) does the analysis, and a Next.js app on Vercel is the front end.
 
 ## What it checks
 
@@ -69,6 +69,10 @@ npm run dev
 | --- | --- |
 | `CONTRACT_ADDRESS` | Deployed `TokenSecurityScanner` contract on GenLayer Studio |
 | `OPERATOR_PRIVATE_KEY` | Funded account that sends scan transactions |
+
+## Contract
+
+The full intelligent contract is in [`contracts/token_security_scanner_v15.py`](contracts/token_security_scanner_v15.py). To run your own copy, deploy that file to GenLayer Studio and put the deployed address in `CONTRACT_ADDRESS`. The web app in `app/` and `lib/` only relays requests to it and renders the stored result.
 
 ## Contract methods
 
