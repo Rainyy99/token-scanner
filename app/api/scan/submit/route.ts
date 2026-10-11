@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
-import { submitScanToken, submitScanPastedCode } from "@/lib/genlayer";
+import { submitScanToken, submitScanSolana, submitScanPastedCode } from "@/lib/genlayer";
+import { SOLANA } from "@/lib/chains";
+import { parseChainRef, addressFitsChain } from "@/lib/validate";
 import { checkRateLimit } from "@/lib/rateLimit";
-
-const ADDRESS_RE = /^0x[a-fA-F0-9]{40}$/;
 
 function getClientIp(req: NextRequest): string {
   const fwd = req.headers.get("x-forwarded-for");
@@ -21,24 +21,31 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  let body: { chainId?: number; address?: string; pastedCode?: string };
+  let body: { chainId?: number | string; address?: string; pastedCode?: string };
   try {
     body = await req.json();
   } catch {
     return NextResponse.json({ error: "invalid_body", message: "Malformed JSON body." }, { status: 400 });
   }
 
-  const { chainId, address, pastedCode } = body;
+  const { address, pastedCode } = body;
 
-  if (typeof chainId !== "number" || !Number.isInteger(chainId) || chainId <= 0) {
+  const chain = parseChainRef(body.chainId);
+  if (chain === null) {
     return NextResponse.json(
-      { error: "invalid_chain_id", message: "chainId must be a positive integer." },
+      { error: "invalid_chain_id", message: "This chain is not supported. Use Solana or one of the listed EVM chains." },
       { status: 400 }
     );
   }
-  if (typeof address !== "string" || !ADDRESS_RE.test(address)) {
+  if (typeof address !== "string" || !addressFitsChain(chain, address)) {
     return NextResponse.json(
-      { error: "invalid_address", message: "address must be a valid 0x-prefixed 40-hex-char address." },
+      {
+        error: "invalid_address",
+        message:
+          chain === SOLANA
+            ? "address must be a valid Solana token mint (base58, 32-44 characters)."
+            : "address must be a valid 0x-prefixed 40-hex-char address.",
+      },
       { status: 400 }
     );
   }
@@ -48,11 +55,21 @@ export async function POST(req: NextRequest) {
       { status: 400 }
     );
   }
+  if (chain === SOLANA && pastedCode && pastedCode.trim() !== "") {
+    return NextResponse.json(
+      { error: "invalid_pasted_code", message: "Pasted source code applies to EVM contracts only." },
+      { status: 400 }
+    );
+  }
 
-  const result =
-    pastedCode && pastedCode.trim() !== ""
-      ? await submitScanPastedCode(chainId, address, pastedCode)
-      : await submitScanToken(chainId, address);
+  let result;
+  if (chain === SOLANA) {
+    result = await submitScanSolana(address);
+  } else if (pastedCode && pastedCode.trim() !== "") {
+    result = await submitScanPastedCode(chain, address, pastedCode);
+  } else {
+    result = await submitScanToken(chain, address);
+  }
 
   if (!result.ok) {
     return NextResponse.json({ error: result.reason, message: result.detail }, { status: 500 });

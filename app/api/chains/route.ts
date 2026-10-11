@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { chainName } from "@/lib/chains";
+import { chainName, isSupportedEvm } from "@/lib/chains";
 
 export const dynamic = "force-dynamic";
 
@@ -8,7 +8,7 @@ const SOURCIFY_BASE = process.env.SOURCIFY_BASE || "https://sourcify.dev";
 
 type Found = { id: number; name: string };
 
-// Finds every chain where this address has verified source on Sourcify.
+// Finds every supported chain where this address has verified source on Sourcify.
 export async function GET(req: NextRequest) {
   const address = req.nextUrl.searchParams.get("address") || "";
   if (!ADDRESS_RE.test(address)) {
@@ -48,7 +48,7 @@ export async function GET(req: NextRequest) {
       if (!item || typeof item !== "object") continue;
       const rec = item as { chainId?: string | number; match?: string | null };
       const id = Number(rec.chainId);
-      if (!Number.isInteger(id) || id <= 0 || seen.has(id)) continue;
+      if (!Number.isInteger(id) || !isSupportedEvm(id) || seen.has(id)) continue;
       if (rec.match === null || rec.match === undefined) continue;
       seen.add(id);
       chains.push({ id, name: chainName(id) });

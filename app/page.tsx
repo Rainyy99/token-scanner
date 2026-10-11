@@ -2,7 +2,8 @@
 
 import { useState, useRef, useEffect } from "react";
 import ResultCard, { type ScanResult } from "./ResultCard";
-import { POPULAR_CHAINS, chainLabel, type ChainOption } from "@/lib/chains";
+import { POPULAR_CHAINS, SOLANA, chainLabel, isSupportedEvm, type ChainOption, type ChainRef } from "@/lib/chains";
+import { EVM_ADDRESS_RE, isSolanaMint } from "@/lib/validate";
 
 type PollResult =
   | { status: "pending"; statusName?: string }
@@ -10,7 +11,7 @@ type PollResult =
   | { status: "done"; result: unknown };
 
 type StoredScan = { txHash: string; submittedAt: number };
-type HistoryItem = { chain_id: number; address: string; verdict: string; source: string };
+type HistoryItem = { chain_id: number | string; address: string; verdict: string; source: string };
 
 const VERDICT_COLOR: Record<string, string> = {
   DANGER: "#b23a2e",
@@ -24,13 +25,12 @@ function shortAddr(a: string): string {
 }
 
 const STALE_MS = 15 * 60 * 1000; // 15 minutes
-const ADDRESS_RE = /^0x[a-fA-F0-9]{40}$/;
 
-function scanKey(chainId: number, address: string): string {
+function scanKey(chainId: ChainRef, address: string): string {
   return `scan:${chainId}:${address.toLowerCase()}`;
 }
 
-function getStoredScan(chainId: number, address: string): StoredScan | null {
+function getStoredScan(chainId: ChainRef, address: string): StoredScan | null {
   try {
     const raw = localStorage.getItem(scanKey(chainId, address));
     if (!raw) return null;
@@ -45,7 +45,7 @@ function getStoredScan(chainId: number, address: string): StoredScan | null {
   }
 }
 
-function setStoredScan(chainId: number, address: string, txHash: string) {
+function setStoredScan(chainId: ChainRef, address: string, txHash: string) {
   try {
     const entry: StoredScan = { txHash, submittedAt: Date.now() };
     localStorage.setItem(scanKey(chainId, address), JSON.stringify(entry));
@@ -54,7 +54,7 @@ function setStoredScan(chainId: number, address: string, txHash: string) {
   }
 }
 
-function clearStoredScan(chainId: number, address: string) {
+function clearStoredScan(chainId: ChainRef, address: string) {
   try {
     localStorage.removeItem(scanKey(chainId, address));
   } catch {
@@ -63,8 +63,7 @@ function clearStoredScan(chainId: number, address: string) {
 }
 
 export default function Home() {
-  const [chainSel, setChainSel] = useState("auto"); // "auto" | chain id | "other"
-  const [customChain, setCustomChain] = useState("");
+  const [chainSel, setChainSel] = useState("auto"); // "auto" | "solana" | EVM chain id
   const [address, setAddress] = useState("");
   const [pastedCode, setPastedCode] = useState("");
   const [phase, setPhase] = useState<"idle" | "detecting" | "choose" | "submitting" | "polling" | "done" | "error">("idle");
@@ -126,7 +125,7 @@ export default function Home() {
     }
   }
 
-  function startPolling(txHash: string, chainIdNum: number, addr: string) {
+  function startPolling(txHash: string, chainIdNum: ChainRef, addr: string) {
     setPhase("polling");
     setMessage("Waiting for validator consensus...");
     const startedAt = Date.now();
@@ -171,7 +170,7 @@ export default function Home() {
     }, 3000);
   }
 
-  async function runScan(chainIdNum: number, others: ChainOption[]) {
+  async function runScan(chainIdNum: ChainRef, others: ChainOption[]) {
     setPicker(null);
     setAlsoOn(others);
 
@@ -223,19 +222,42 @@ export default function Home() {
     setAlsoOn([]);
 
     const addr = address.trim();
-    if (!ADDRESS_RE.test(addr)) {
+    const isEvm = EVM_ADDRESS_RE.test(addr);
+    const isSol = isSolanaMint(addr);
+    if (!isEvm && !isSol) {
       setPhase("error");
-      setMessage("Enter a valid token address (0x followed by 40 hex characters).");
+      setMessage("Enter a valid token address: 0x followed by 40 hex characters (EVM), or a Solana token mint.");
       return;
     }
     if (addr !== address) setAddress(addr);
 
+    // Solana mints are recognised by their format; no chain lookup is needed.
+    if (isSol) {
+      if (chainSel !== "auto" && chainSel !== SOLANA) {
+        setPhase("error");
+        setMessage("This looks like a Solana address, but an EVM chain is selected. Choose Solana or Auto-detect.");
+        return;
+      }
+      if (pastedCode.trim() !== "") {
+        setPhase("error");
+        setMessage("Pasted source code applies to EVM contracts only. Clear that field to scan a Solana token.");
+        return;
+      }
+      await runScan(SOLANA, []);
+      return;
+    }
+    if (chainSel === SOLANA) {
+      setPhase("error");
+      setMessage("Solana is selected, but this is an EVM address. Choose an EVM chain or Auto-detect.");
+      return;
+    }
+
     // Chain picked by hand: scan it directly.
     if (chainSel !== "auto") {
-      const idNum = chainSel === "other" ? Number(customChain) : Number(chainSel);
-      if (!Number.isInteger(idNum) || idNum <= 0) {
+      const idNum = Number(chainSel);
+      if (!isSupportedEvm(idNum)) {
         setPhase("error");
-        setMessage("Enter a valid chain ID (a positive whole number).");
+        setMessage("This chain is not supported.");
         return;
       }
       await runScan(idNum, []);
@@ -265,7 +287,7 @@ export default function Home() {
       setPhase("error");
       setMessage(
         pastedCode.trim() === ""
-          ? "No verified source found for this address on any chain. Pick a chain from the list, or paste the source code."
+          ? "No verified source found for this address on a supported chain. Pick a chain from the list to scan it anyway (market data is still checked), or paste the source code."
           : "Chain not detected. Pick the chain this contract is on, then scan again."
       );
       return;
@@ -293,8 +315,9 @@ export default function Home() {
     <main className="ts-page">
       <h1 className="ts-title">Token Security Scanner</h1>
       <p className="ts-lede">
-        Paste a token address. Reviewers read its verified source code and report which powers
-        its owner holds: minting, freezing, pausing and upgrading.
+        Paste an EVM token address or a Solana token mint. The scanner reads the contract&apos;s powers,
+        checks who holds the supply and how old and established the token is, then files one case report.
+        It never calls a token safe.
       </p>
 
       <form className="ts-form" onSubmit={handleScan}>
@@ -307,7 +330,7 @@ export default function Home() {
             className="ts-input"
             value={address}
             onChange={(e) => setAddress(e.target.value)}
-            placeholder="0x..."
+            placeholder="0x… or Solana mint"
             autoComplete="off"
             autoCapitalize="off"
             spellCheck={false}
@@ -330,19 +353,9 @@ export default function Home() {
                 {c.name} · {c.id}
               </option>
             ))}
-            <option value="other">Other (enter chain ID)…</option>
+            <option value={SOLANA}>Solana</option>
           </select>
-          {chainSel === "other" && (
-            <input
-              className="ts-input"
-              value={customChain}
-              onChange={(e) => setCustomChain(e.target.value)}
-              inputMode="numeric"
-              placeholder="Chain ID, e.g. 59144"
-              aria-label="Chain ID"
-            />
-          )}
-          <p className="ts-hint">Leave on Auto-detect and the scanner finds the chain from the address.</p>
+          <p className="ts-hint">Leave on Auto-detect: Solana is recognised from the address, EVM chains are looked up automatically.</p>
         </div>
 
         <div className="ts-field">
@@ -364,8 +377,8 @@ export default function Home() {
         </button>
 
         <p className="ts-note">
-          Large, multi-file or proxy contracts take longer and sometimes fail validator consensus.
-          If that happens, paste the contract&apos;s source code directly.
+          Scans take a minute or two. Large, multi-file or proxy contracts take longer and sometimes fail validator
+          consensus. If that happens, try again or paste the contract&apos;s source code directly.
         </p>
       </form>
 

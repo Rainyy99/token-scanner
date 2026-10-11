@@ -5,8 +5,42 @@ type Tone = "red" | "brass" | "green" | "grey" | "steel";
 
 type Finding = { answer?: string; function?: string; reason?: string };
 
+type Flag = { code?: string; level?: string; text?: string };
+
+type Final = {
+  headline?: string;
+  tone?: string;
+  contract_verdict?: string;
+  profile?: string;
+  profile_label?: string;
+  subline?: string;
+  flags?: Flag[];
+  notes?: string[];
+  disclaimer?: string;
+};
+
+type Market = {
+  available?: boolean;
+  holders?: string;
+  concentration?: string;
+  top_wallets?: string;
+  in_contracts?: string;
+  locked?: string;
+  top10?: string;
+  insiders?: string;
+  lp_locked?: string;
+  lp_coverage?: string;
+  markets?: unknown[];
+  launchpad?: boolean | string | null;
+  graduated?: boolean | null;
+  dex_paid?: boolean;
+};
+
 export type ScanResult = {
-  chain_id?: number;
+  chain_id?: number | string;
+  today?: string;
+  final?: Final;
+  market?: Market;
   input_address?: string;
   analyzed_address?: string;
   is_proxy?: boolean;
@@ -130,10 +164,66 @@ const CATEGORIES: Array<{ key: string; title: string; meaning: string }> = [
 
 const LIMITS = [
   "Who holds the admin or upgrade keys, and whether they sit behind a multisig or a timelock.",
-  "Off-chain controls, and the reputation of whoever issued the token.",
+  "Off-chain controls, and whether a stablecoin still trades at its peg (the peg is not checked).",
   "Whether the code has been professionally audited.",
-  "How other contracts that interact with this token behave.",
+  "Who owns each large wallet. Unlabeled treasury or exchange wallets can make concentration look higher than it is.",
+  "Source code is read from Sourcify, so contracts it has not verified cannot be reviewed.",
 ];
+
+const HEAD_TONE: Record<string, Tone> = {
+  danger: "red",
+  caution: "brass",
+  positive: "green",
+  neutral: "steel",
+  unknown: "grey",
+};
+
+const LEVEL: Record<string, { text: string; tone: Tone }> = {
+  danger: { text: "Danger", tone: "red" },
+  warn: { text: "Warning", tone: "red" },
+  caution: { text: "Caution", tone: "brass" },
+  info: { text: "Note", tone: "grey" },
+};
+
+function titleCase(v?: string): string {
+  if (!v) return "";
+  return v.charAt(0).toUpperCase() + v.slice(1).toLowerCase();
+}
+
+// Bucket strings such as "50-60%" or "30-40" (percent sign may be missing).
+function pct(v?: string): string {
+  if (!v || v === "unknown") return "";
+  return /\d$/.test(v) ? v + "%" : v;
+}
+
+function marketFacts(m: Market | undefined, solana: boolean): Array<[string, string]> {
+  const out: Array<[string, string]> = [];
+  if (!m || m.available === false) {
+    out.push(["Market data", "Unavailable right now, so holders and structure were not checked"]);
+    return out;
+  }
+  const add = (label: string, v: string) => {
+    if (v) out.push([label, v]);
+  };
+  const known = (v?: string) => (v && v !== "unknown" ? v : "");
+  add("Holders", known(m.holders));
+  add("Concentration", titleCase(known(m.concentration)));
+  if (solana) {
+    add("Top 10 wallets", pct(m.top10));
+    add("Insider wallets", pct(m.insiders));
+    const lp = pct(m.lp_locked);
+    const cov = known(m.lp_coverage);
+    add("Liquidity locked", lp ? lp + (cov ? " (of pools we could read: " + pct(cov) + ")" : "") : "");
+    if (Array.isArray(m.markets) && m.markets.length > 0) add("Markets", String(m.markets.length));
+    if (typeof m.launchpad === "string" && m.launchpad) add("Launchpad", m.launchpad);
+  } else {
+    add("Top wallets", pct(m.top_wallets));
+    add("Held in contracts", pct(m.in_contracts));
+    add("Locked", pct(m.locked));
+    if (m.launchpad === true) add("Launchpad", m.graduated === true ? "Graduated to a DEX pool" : "Still on the launchpad curve");
+  }
+  return out;
+}
 
 function shortAddr(addr?: string): string {
   if (!addr) return "unknown address";
@@ -181,16 +271,25 @@ export default function ResultCard({
   result: ScanResult;
   alsoOn?: { id: number; name: string }[];
 }) {
+  const fin = result.final && typeof result.final === "object" ? result.final : null;
+  const isSolana = result.chain_id === "solana";
   const verdictKey = result.verdict || "";
-  const meta = VERDICTS[verdictKey] || {
+  const verdictMeta = VERDICTS[verdictKey] || {
     label: verdictKey || "Unknown",
     tone: "grey" as Tone,
     summary: "The scan finished with a result this page does not recognize. See the raw data below.",
   };
+  // New scans carry a composed result (contract + profile + market). Pasted-code scans do not.
+  const stampText = fin?.headline || verdictMeta.label;
+  const tone: Tone = fin ? HEAD_TONE[fin.tone || ""] || "grey" : verdictMeta.tone;
+  const summary = fin?.subline || verdictMeta.summary;
 
   const findings = result.llm_findings && typeof result.llm_findings === "object" ? result.llm_findings : null;
   const explanation = findings && typeof findings["explanation"] === "string" ? (findings["explanation"] as string) : "";
   const review = result.review || null;
+  const market = result.market;
+  const flags = fin && Array.isArray(fin.flags) ? fin.flags : [];
+  const notes = fin && Array.isArray(fin.notes) ? fin.notes : [];
 
   const implDiffers =
     !!result.analyzed_address &&
@@ -207,30 +306,38 @@ export default function ResultCard({
   const facts: Array<[string, string]> = [];
   if (result.chain_id !== undefined) facts.push(["Chain", chainLabel(result.chain_id)]);
   if (alsoOn && alsoOn.length > 0) facts.push(["Also verified on", alsoOn.map((c) => chainLabel(c.id)).join(", ")]);
-  facts.push([
-    "Source",
-    result.source === "pasted" ? "Pasted code" : result.verified ? "Verified on Sourcify" : "No verified source",
-  ]);
-  facts.push([
-    "Proxy",
-    result.is_proxy
-      ? (result.proxy_type || "Yes") + (result.verified ? " · implementation analyzed" : " · implementation not readable")
-      : "No",
-  ]);
-  if (review) {
-    if (review.project_files !== undefined && review.library_files !== undefined) {
-      facts.push(["Files", review.project_files + " project · " + review.library_files + " library"]);
+  if (!isSolana) {
+    if (fin?.contract_verdict) facts.push(["Contract verdict", titleCase(fin.contract_verdict)]);
+    facts.push([
+      "Source",
+      result.source === "pasted" ? "Pasted code" : result.verified ? "Verified on Sourcify" : "No verified source",
+    ]);
+    facts.push([
+      "Proxy",
+      result.is_proxy
+        ? (result.proxy_type || "Yes") + (result.verified ? " · implementation analyzed" : " · implementation not readable")
+        : "No",
+    ]);
+    if (review) {
+      if (review.project_files !== undefined && review.library_files !== undefined) {
+        facts.push(["Files", review.project_files + " project · " + review.library_files + " library"]);
+      }
+      if (review.functions_total !== undefined && review.functions_public_nonview !== undefined) {
+        facts.push(["Functions", review.functions_total + " total · " + review.functions_public_nonview + " state-changing"]);
+      }
+      if (flagText) facts.push(["Low-level flags", flagText]);
     }
-    if (review.functions_total !== undefined && review.functions_public_nonview !== undefined) {
-      facts.push(["Functions", review.functions_total + " total · " + review.functions_public_nonview + " state-changing"]);
-    }
-    if (flagText) facts.push(["Low-level flags", flagText]);
+  } else {
+    if (fin?.contract_verdict) facts.push(["Token authorities", titleCase(fin.contract_verdict)]);
+    facts.push(["Source", "RugCheck, Jupiter and DexScreener"]);
   }
+  if (result.today) facts.push(["Scanned on", result.today]);
 
+  const mFacts = fin ? marketFacts(market, isSolana) : [];
   const truncated = !!(review && (review.map_truncated || review.snippets_truncated));
 
   return (
-    <section className={"rc-card rc-tone-" + meta.tone} aria-label="Scan result">
+    <section className={"rc-card rc-tone-" + tone} aria-label="Scan result">
       <div className="rc-head">
         <div>
           <p className="rc-eyebrow">Case file{result.chain_id !== undefined ? " · " + chainLabel(result.chain_id) : ""}</p>
@@ -245,10 +352,24 @@ export default function ResultCard({
             )}
           </p>
         </div>
-        <div className="rc-stamp">{meta.label}</div>
+        <div className={"rc-stamp" + (stampText.length > 14 ? " rc-stamp-long" : "")}>{stampText}</div>
       </div>
 
-      <p className="rc-summary">{meta.summary}</p>
+      {fin && (
+        <div className="rc-tags">
+          <span className="rc-tag">{fin.profile_label || titleCase(fin.profile)}</span>
+          {market?.dex_paid === true && (
+            <span
+              className="rc-tag rc-tag-dex"
+              title="A paid DexScreener profile or ad exists for this token. It shows the team paid for visibility; it says nothing about safety."
+            >
+              DEX Paid
+            </span>
+          )}
+        </div>
+      )}
+
+      <p className="rc-summary">{summary}</p>
 
       {explanation && <p className="rc-notice">{explanation}</p>}
       {truncated && (
@@ -263,9 +384,53 @@ export default function ResultCard({
         </p>
       )}
 
+      {fin && flags.length > 0 && (
+        <>
+          <h3 className="rc-section">Flags raised</h3>
+          <ul className="rc-findings">
+            {flags.map((f, i) => {
+              const lv = LEVEL[f.level || ""] || LEVEL.info;
+              return (
+                <li key={(f.code || "flag") + i} className="rc-finding">
+                  <div className="rc-finding-top">
+                    <span className="rc-finding-title">{f.text}</span>
+                    <span className={"rc-chip rc-tone-" + lv.tone}>{lv.text}</span>
+                  </div>
+                </li>
+              );
+            })}
+          </ul>
+        </>
+      )}
+
+      {fin && notes.length > 0 && (
+        <>
+          <h3 className="rc-section">Also noted</h3>
+          <ul className="rc-limits">
+            {notes.map((n, i) => (
+              <li key={i}>{n}</li>
+            ))}
+          </ul>
+        </>
+      )}
+
+      {mFacts.length > 0 && (
+        <>
+          <h3 className="rc-section">Market structure</h3>
+          <dl className="rc-facts">
+            {mFacts.map(([label, value]) => (
+              <div key={label} className="rc-fact">
+                <dt>{label}</dt>
+                <dd>{value}</dd>
+              </div>
+            ))}
+          </dl>
+        </>
+      )}
+
       {findings && CATEGORIES.some((c) => asFinding(findings[c.key]) !== null) && (
         <>
-          <h3 className="rc-section">What was checked</h3>
+          <h3 className="rc-section">What was checked in the code</h3>
           <ul className="rc-findings">
             {CATEGORIES.map((c) => {
               const f = asFinding(findings[c.key]);
@@ -300,7 +465,7 @@ export default function ResultCard({
         </>
       )}
 
-      <h3 className="rc-section">About this contract</h3>
+      <h3 className="rc-section">About this token</h3>
       <dl className="rc-facts">
         {facts.map(([label, value]) => (
           <div key={label} className="rc-fact">
@@ -316,7 +481,10 @@ export default function ResultCard({
           <li key={l}>{l}</li>
         ))}
       </ul>
-      <p className="rc-foot">A flagged capability means it exists in the code, not that anyone has used it.</p>
+      <p className="rc-foot">
+        {fin?.disclaimer || "Automated analysis. Not financial advice and not a guarantee."} A flagged capability means it
+        exists in the code, not that anyone has used it.
+      </p>
 
       <details className="rc-raw">
         <summary>Show raw data</summary>

@@ -24,7 +24,7 @@ export type SubmitResult =
   | { ok: false; reason: "config_error"; detail: string };
 
 async function submitWrite(
-  functionName: "scan_token" | "scan_pasted_code",
+  functionName: "scan_token" | "scan_pasted_code" | "scan_token_full" | "scan_solana_token",
   args: unknown[]
 ): Promise<SubmitResult> {
   if (!CONTRACT_ADDRESS) {
@@ -47,8 +47,17 @@ async function submitWrite(
   return { ok: true, txHash: txHash as string };
 }
 
+// The contract needs today's date (YYYY-MM-DD, UTC) because validators have no clock.
+export function todayUtc(): string {
+  return new Date().toISOString().slice(0, 10);
+}
+
 export async function submitScanToken(chainId: number, address: string): Promise<SubmitResult> {
-  return submitWrite("scan_token", [chainId, address]);
+  return submitWrite("scan_token_full", [chainId, address, todayUtc()]);
+}
+
+export async function submitScanSolana(mint: string): Promise<SubmitResult> {
+  return submitWrite("scan_solana_token", [mint, todayUtc()]);
 }
 
 export async function submitScanPastedCode(
@@ -68,7 +77,7 @@ export type StatusResult =
 
 export async function checkScanStatus(
   txHash: string,
-  chainId: number,
+  chainId: number | "solana",
   address: string
 ): Promise<StatusResult> {
   const client = getReadClient();
@@ -117,8 +126,8 @@ export async function checkScanStatus(
   try {
     scanJson = (await client.readContract({
       address: CONTRACT_ADDRESS,
-      functionName: "get_scan",
-      args: [chainId, address],
+      functionName: chainId === "solana" ? "get_solana_scan" : "get_scan",
+      args: chainId === "solana" ? [address] : [chainId, address],
     })) as string;
   } catch (e) {
     return { status: "failed", reason: "read_failed", detail: String(e) };
@@ -136,7 +145,7 @@ export async function checkScanStatus(
 
 // ---- History (recent scans, shared by all visitors) ----
 
-export type HistoryEntry = { chain_id: number; address: string; verdict: string; source: string };
+export type HistoryEntry = { chain_id: number | "solana"; address: string; verdict: string; source: string };
 
 export async function getRecentScans(limit = 10): Promise<HistoryEntry[]> {
   if (!CONTRACT_ADDRESS) return [];
@@ -149,12 +158,12 @@ export async function getRecentScans(limit = 10): Promise<HistoryEntry[]> {
   return Array.isArray(parsed) ? parsed : [];
 }
 
-export async function getStoredScanResult(chainId: number, address: string): Promise<unknown | null> {
+export async function getStoredScanResult(chainId: number | "solana", address: string): Promise<unknown | null> {
   if (!CONTRACT_ADDRESS) return null;
   const raw = (await getReadClient().readContract({
     address: CONTRACT_ADDRESS,
-    functionName: "get_scan",
-    args: [chainId, address],
+    functionName: chainId === "solana" ? "get_solana_scan" : "get_scan",
+    args: chainId === "solana" ? [address] : [chainId, address],
   })) as string;
   const parsed = JSON.parse(raw);
   return parsed && typeof parsed === "object" && Object.keys(parsed).length > 0 ? parsed : null;

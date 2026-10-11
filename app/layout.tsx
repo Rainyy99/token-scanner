@@ -3,7 +3,7 @@ import "./globals.css";
 
 export const metadata: Metadata = {
   title: "Token Security Scanner",
-  description: "AI-powered token contract security scanner on GenLayer.",
+  description: "Token security scanner for EVM chains and Solana, run by validators on GenLayer.",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

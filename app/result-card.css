@@ -244,3 +244,35 @@
 }
 .rc-access-open { border-left-color: #b23a2e; color: #e6a79f; }
 .rc-access-gated { border-left-color: #3f6682; color: #9fbad0; }
+
+/* v15: profile tags, DEX Paid label, long headlines */
+.rc-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 14px 0 0;
+}
+
+.rc-tag {
+  padding: 3px 8px;
+  border: 1px solid var(--rc-line);
+  border-radius: 2px;
+  background: var(--rc-deep);
+  color: var(--rc-ink);
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+/* Neutral on purpose: a paid listing is not a safety signal. */
+.rc-tag-dex {
+  color: var(--rc-mute);
+  border-style: dashed;
+  cursor: help;
+}
+
+.rc-stamp-long {
+  max-width: 190px;
+  font-size: 14px;
+  letter-spacing: 0.05em;
+}

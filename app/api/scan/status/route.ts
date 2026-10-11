@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { checkScanStatus } from "@/lib/genlayer";
+import { parseChainRef, addressFitsChain } from "@/lib/validate";
 
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
@@ -10,17 +11,17 @@ export async function GET(req: NextRequest) {
   if (!txHash || !txHash.startsWith("0x")) {
     return NextResponse.json({ error: "invalid_hash", message: "hash query param is required." }, { status: 400 });
   }
-  const chainId = Number(chainIdRaw);
-  if (!chainIdRaw || !Number.isInteger(chainId) || chainId <= 0) {
+  const chain = parseChainRef(chainIdRaw);
+  if (chain === null) {
     return NextResponse.json(
-      { error: "invalid_chain_id", message: "chainId query param must be a positive integer." },
+      { error: "invalid_chain_id", message: "chainId query param is not a supported chain." },
       { status: 400 }
     );
   }
-  if (!address) {
-    return NextResponse.json({ error: "invalid_address", message: "address query param is required." }, { status: 400 });
+  if (!address || !addressFitsChain(chain, address)) {
+    return NextResponse.json({ error: "invalid_address", message: "address query param is not valid for this chain." }, { status: 400 });
   }
 
-  const result = await checkScanStatus(txHash, chainId, address);
+  const result = await checkScanStatus(txHash, chain, address);
   return NextResponse.json(result);
 }
