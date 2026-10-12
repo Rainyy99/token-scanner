@@ -111,6 +111,8 @@ The live web app uses this same address (`CONTRACT_ADDRESS`). Each scan below wa
 | USDC, Base (8453) `0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913` | `scan_token_full` | `0x996b9cdfa7e60722fc4c191df475c06bfe34401330b72455b9df7b9c07d3d1ac` | proxy followed to `0x2Ce6311ddAE708829bc0784C967b7d77D19FD779`; contract verdict CENTRALIZED (mint, blacklist, pause and upgrade found, low-level calls UNCLEAR); headline STABLECOIN with the incomplete-check note |
 | JUP, Solana `JUPyiwrYJFskUPiHa7hkeR8VUtAeFoSYbKedZNsDvCN` | `scan_solana_token` | `0xa4aaaad4cd4f9c35ba9cf0b66df130176b5d186bcf48cddbbb86e600d9e35ac8` | headline NO RED FLAGS FOUND, established token, liquidity lock only partly checkable |
 
+Screenshots of the live app after each scan (results rendered from the contract readback) are in [`docs/screenshots`](docs/screenshots): [UNI](docs/screenshots/ui-uni-ethereum.jpg), [USDC on Base](docs/screenshots/ui-usdc-base.jpg), [JUP on Solana](docs/screenshots/ui-jup-solana.jpg), and Studio showing the deployed contract returning [`v16`](docs/screenshots/studio-get-version-v16.jpg).
+
 ## Contract
 
 The full intelligent contract is in [`contracts/token_security_scanner_v16.py`](contracts/token_security_scanner_v16.py). To run your own copy, deploy that file to GenLayer Studio and put the deployed address in `CONTRACT_ADDRESS`. The web app in `app/` and `lib/` only relays requests to it and renders the stored result.
