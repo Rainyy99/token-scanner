@@ -795,6 +795,32 @@ def _reconcile_findings(findings: dict, review: dict) -> dict:
                 "reason": "The cited function only credits value sent with it (a deposit or wrap), not a free mint.",
                 "adjusted": True,
             }
+    # A NO answer that the code contradicts is never kept as a clean result.
+    for cat in ["unrestricted_mint", "blacklist_or_freeze", "upgrade_without_timelock"]:
+        entry = findings.get(cat, {})
+        if entry.get("answer") != "NO":
+            continue
+        acc = review.get("access", {}).get(cat, "none")
+        names = review.get("access_fns", {}).get(cat, [])
+        first = str(names[0]) if len(names) > 0 else ""
+        if acc == "open":
+            findings[cat] = {
+                "answer": "UNCLEAR", "function": first,
+                "reason": "The reviewer answered NO, but the code has a matching function with no access restriction found (" + first + "); needs manual review.",
+                "adjusted": True,
+            }
+        elif acc == "gated" and cat != "upgrade_without_timelock":
+            findings[cat] = {
+                "answer": "YES", "function": first,
+                "reason": "The reviewer answered NO, but a matching privileged function exists in the code (" + first + ").",
+                "adjusted": True,
+            }
+        elif acc == "gated":
+            findings[cat] = {
+                "answer": "UNCLEAR", "function": first,
+                "reason": "An upgrade function exists (" + first + ") and the code does not show whether a delay applies; needs manual review.",
+                "adjusted": True,
+            }
     low = findings.get("hidden_privileged_calls", {})
     flags = review.get("flags", {})
     parts = []
@@ -817,32 +843,72 @@ def _is_open(cat: str, fname: str, review: dict) -> bool:
     disebut LLM, supaya hasil tidak berubah-ubah antar run."""
     if not isinstance(review, dict):
         return False
-    if review.get("project_files", 0) > 30:
-        return False
     access = review.get("access", {})
     return access.get(cat) == "open"
 
 
+BUNDLE_WIDE_FILES = 30
+CRITICAL_CATEGORIES = ["unrestricted_mint", "upgrade_without_timelock", "hidden_privileged_calls"]
+
+
+def _bundle_wide(review) -> bool:
+    """True when the verified source covers a whole multi-contract system.
+    Function evidence then cannot be attributed to the token being scanned."""
+    if not isinstance(review, dict):
+        return False
+    n = review.get("project_files", 0)
+    return isinstance(n, int) and n > BUNDLE_WIDE_FILES
+
+
 def _compute_verdict(findings: dict, review: dict = None) -> str:
+    """CLEAR only when all five checks were settled as NO on complete code.
+    Anything unresolved is INCONCLUSIVE; it is never reported as clean."""
     yes_cats = []
-    unclear_count = 0
+    unclear_cats = []
     for cat in RISK_CATEGORIES:
         ans = findings.get(cat, {}).get("answer")
         if ans == "YES":
             yes_cats.append(cat)
-        elif ans == "UNCLEAR":
-            unclear_count += 1
-    if len(yes_cats) == 0:
-        if unclear_count >= 3:
-            return "INCONCLUSIVE"
-        return "CLEAR"
+        elif ans != "NO":
+            unclear_cats.append(cat)
+    wide = _bundle_wide(review)
+    ambiguous_open = False
     for cat in yes_cats:
         fname = str(findings.get(cat, {}).get("function", ""))
         if _is_open(cat, fname, review):
-            return "DANGER"
+            if wide:
+                ambiguous_open = True
+            else:
+                return "DANGER"
+    if ambiguous_open:
+        return "INCONCLUSIVE"
     if len(yes_cats) >= 2:
         return "CENTRALIZED"
-    return "CAUTION"
+    if len(yes_cats) == 1:
+        return "CAUTION"
+    if len(unclear_cats) > 0:
+        return "INCONCLUSIVE"
+    if isinstance(review, dict) and (review.get("map_truncated") or review.get("snippets_truncated")):
+        return "INCONCLUSIVE"
+    return "CLEAR"
+
+
+def _incomplete_reasons(findings: dict, review: dict, parse_ok: bool) -> list:
+    """Short codes for everything that limits how far the verdict can be trusted."""
+    out = []
+    if parse_ok is not True:
+        out.append("llm_parse")
+    if isinstance(review, dict):
+        if review.get("map_truncated"):
+            out.append("map_truncated")
+        if review.get("snippets_truncated"):
+            out.append("snippets_truncated")
+    if _bundle_wide(review):
+        out.append("bundle_wide")
+    for cat in RISK_CATEGORIES:
+        if findings.get(cat, {}).get("answer") not in ["YES", "NO"]:
+            out.append("unclear:" + cat)
+    return out
 
 
 DEFAULT_UNVERIFIED_EXPLANATION = (
@@ -2428,12 +2494,21 @@ def me_evm_market (gp ,pons ,profile ,months )->dict :
 
     if not available :
         flags .append (me__flag ("no_market_data","info"if soft else "caution",
-        "Market data was unavailable, so holder structure could not be checked"))
+        "Market data was unavailable, so honeypot status, tax, liquidity and holder structure are not verified"))
     else :
         if gp .get ("honeypot")=="yes":
             flags .append (me__flag ("honeypot","danger","Flagged as a honeypot by GoPlus: selling may be impossible"))
+        elif gp .get ("honeypot")!="no":
+            flags .append (me__flag ("honeypot_unverified","info"if soft else "caution",
+            "Honeypot status could not be verified, so selling may not be possible"))
         if gp .get ("buy_tax")=="high"or gp .get ("sell_tax")=="high":
             flags .append (me__flag ("high_tax","warn","Trading tax is above 5%"))
+        elif gp .get ("buy_tax")=="unknown"or gp .get ("sell_tax")=="unknown":
+            flags .append (me__flag ("tax_unverified","info"if soft else "caution",
+            "Trading tax could not be verified"))
+        if gp .get ("in_dex")=="no":
+            flags .append (me__flag ("no_dex_pool","info"if soft else "caution",
+            "No DEX pool was found for this token, so liquidity could not be confirmed"))
         if gp .get ("tax_modifiable")=="yes"and not soft :
             flags .append (me__flag ("tax_modifiable","caution","The owner can change the trading tax"))
 
@@ -2559,7 +2634,7 @@ def msol_solana_market (rc ,jup ,dex ,profile ,months )->dict :
     holders_eff =msol_best_holders (struct .get ("holders_bucket"),jup_holders )
     if not available :
         flags .append (msol__flag ("no_market_data","info"if soft else "caution",
-        "Market data was unavailable, so holder structure could not be checked"))
+        "Market data was unavailable, so honeypot status, tax, liquidity and holder structure are not verified"))
     else :
         if rc .get ("rugged")is True :
             flags .append (msol__flag ("rugged","danger","RugCheck marks this token as rugged"))
@@ -2614,6 +2689,15 @@ def msol_solana_market (rc ,jup ,dex ,profile ,months )->dict :
             flags .append (msol__flag ("few_holders","info"if soft else "caution","Fewer than 100 holders"))
         elif holders =="100-499":
             flags .append (msol__flag ("small_holder_base","info","Small holder base (100 to 499 holders)"))
+        elif holders not in ("500-1999","2000-9999","10000+"):
+            flags .append (msol__flag ("holders_unverified","info","Holder count could not be verified"))
+
+        mkts =struct .get ("market_types")
+        if isinstance (mkts ,list )and len (mkts )==0 and not soft :
+            flags .append (msol__flag ("no_pool","caution",
+            "No trading pool was found for this token, so liquidity could not be confirmed"))
+        elif lp not in ("0-10","10-50","50-90","90+")and not partial :
+            flags .append (msol__flag ("liquidity_lock_unverified","info","Liquidity lock status could not be verified"))
 
     if months is not None and months <1 :
         flags .append (msol__flag ("very_young","caution","Launched less than a month ago"))
@@ -2696,6 +2780,8 @@ def cp__subline (headline ,profile ,label )->str :
         return label +". The source code is not available from Sourcify, so the contract could not be reviewed here (another data source reports it as open source)."
     if headline .startswith ("STABLECOIN"):
         return label +". Address matches the issuer's official contract; the current peg is not checked."
+    if headline =="INCONCLUSIVE":
+        return label +". Some checks could not be settled, so no verdict is given. See the notes below."
     if headline =="NO CONTRACT RED FLAGS":
         if profile =="launchpad":
             return label +". Contract checks passed, but reputation and age are not established."
@@ -2819,19 +2905,38 @@ def fx_parse_cg(raw) -> dict:
     return d if isinstance(d, dict) else {"ok": False}
 
 
-BUNDLE_WIDE_FILES = 30
+INCOMPLETE_TEXT = {
+    "llm_parse": "The reviewer's answer could not be read cleanly, so unreadable checks were treated as unsettled",
+    "map_truncated": "Part of the contract's function list was too large to include, so the review may be incomplete",
+    "snippets_truncated": "Part of the contract's code was too large to include, so the review may be incomplete",
+    "bundle_wide": "The verified source covers a multi-contract system, so findings cannot be tied to this token alone; an unrestricted function found there is reported as inconclusive, not as danger",
+    "source_lookup_failed": "The source code lookup failed, so the contract was not reviewed; this says nothing about the contract itself",
+}
+INCOMPLETE_CATEGORY = {
+    "unrestricted_mint": "minting power",
+    "blacklist_or_freeze": "blacklist or freeze",
+    "pause_transfers": "transfer pause",
+    "upgrade_without_timelock": "instant upgrades",
+    "hidden_privileged_calls": "privileged low-level calls",
+}
 
 
-def fx_bundle_flag(review):
-    if isinstance(review, dict) and isinstance(review.get("project_files"), int) \
-            and review["project_files"] > BUNDLE_WIDE_FILES:
-        return {"code": "bundle_wide", "level": "info",
-                "text": "The verified source covers a multi-contract system (" + str(review["project_files"])
-                        + " project files), so the analyzer cannot tell which functions belong to this token; contract findings are capped below DANGER"}
-    return None
+def fx_incomplete_flags(reasons) -> list:
+    out = []
+    if not isinstance(reasons, list):
+        return out
+    for r in reasons:
+        if not isinstance(r, str):
+            continue
+        if r in INCOMPLETE_TEXT:
+            out.append({"code": r, "level": "info", "text": INCOMPLETE_TEXT[r]})
+        elif r.startswith("unclear:") and r[8:] in INCOMPLETE_CATEGORY:
+            out.append({"code": r, "level": "info",
+                        "text": "Check not settled: " + INCOMPLETE_CATEGORY[r[8:]] + ", so this result is not a clean bill"})
+    return out
 
 
-def fx_evm_final(chain_id: int, address: str, today: str, verdict: str, mk: dict, cg: dict, review=None) -> dict:
+def fx_evm_final(chain_id: int, address: str, today: str, verdict: str, mk: dict, cg: dict, incomplete=None) -> dict:
     gp = mk.get("gp") if isinstance(mk.get("gp"), dict) else {}
     pons = mk.get("pons") if isinstance(mk.get("pons"), dict) else None
     start_date, launchpad = fx_pons_start(pons)
@@ -2842,9 +2947,8 @@ def fx_evm_final(chain_id: int, address: str, today: str, verdict: str, mk: dict
                            "today": today, "start_date": start_date, "launchpad": launchpad,
                            "gp": gp, "cg": cg})
     market = me_evm_market(gp, pons, profile["profile"], profile["age_months"])
-    bf = fx_bundle_flag(review)
-    if bf is not None and isinstance(market.get("flags"), list):
-        market["flags"].append(bf)
+    if isinstance(market.get("flags"), list):
+        market["flags"].extend(fx_incomplete_flags(incomplete))
     final = cp_compose(verdict, profile, market, gp.get("open_source") == "yes")
     return {"profile": profile, "market": market, "final": final}
 
@@ -2918,6 +3022,12 @@ class TokenSecurityScanner(gl.Contract):
 
         analysis = json.loads(gl.eq_principle.strict_eq(do_fetch))
 
+        if not analysis["verified"] and analysis.get("reason") in ["fetch_error", "not_json", "not_dict"]:
+            analysis["verdict"] = "INCONCLUSIVE"
+            analysis["llm_findings"] = {"explanation": "The source code lookup failed, so this contract was not reviewed. This says nothing about the contract itself; try again."}
+            analysis["incomplete"] = ["source_lookup_failed"]
+            return analysis
+
         if not analysis["verified"]:
             explanation = _unverified_explanation(analysis["is_proxy"])
             analysis["verdict"] = "UNVERIFIED"
@@ -2942,6 +3052,7 @@ class TokenSecurityScanner(gl.Contract):
         findings = _reconcile_findings(findings, review)
         analysis["llm_findings"] = findings
         analysis["verdict"] = _compute_verdict(findings, review)
+        analysis["incomplete"] = _incomplete_reasons(findings, review, parse_ok)
         return analysis
 
     @gl.public.write
@@ -2978,7 +3089,7 @@ class TokenSecurityScanner(gl.Contract):
         platform = CG_PLATFORMS.get(chain_id)
         if platform is not None:
             cg = fx_parse_cg(self._cg_run(platform, address))
-        res = fx_evm_final(chain_id, address, today, analysis["verdict"], mk, cg, analysis.get("review"))
+        res = fx_evm_final(chain_id, address, today, analysis["verdict"], mk, cg, analysis.get("incomplete"))
         analysis["profile"] = res["profile"]
         analysis["market"] = res["market"]
         analysis["final"] = res["final"]
@@ -3015,7 +3126,7 @@ class TokenSecurityScanner(gl.Contract):
 
     @gl.public.view
     def get_version(self) -> str:
-        return "v15"
+        return "v16"
 
     @gl.public.write
     def scan_pasted_code(self, chain_id: int, address: str, pasted_code: str) -> None:
@@ -3069,6 +3180,7 @@ class TokenSecurityScanner(gl.Contract):
         findings = _reconcile_findings(findings, review)
         analysis["llm_findings"] = findings
         analysis["verdict"] = _compute_verdict(findings, review)
+        analysis["incomplete"] = _incomplete_reasons(findings, review, parse_ok)
 
         self._record(key, analysis)
 

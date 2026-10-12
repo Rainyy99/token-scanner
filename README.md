@@ -43,9 +43,9 @@ On Robinhood Chain, tokens launched through Pons also get a launch date and laun
 - **Unlabeled wallets can inflate concentration.** Treasuries, exchanges and vaults without a public label look like large holders.
 - **No "safe" label, ever.** "No red flags found" means none of the checks fired.
 - **Source code comes from Sourcify only.** Contracts it has not verified cannot be reviewed; they get UNVERIFIED CONTRACT, or CODE NOT AVAILABLE TO ANALYZER when another source reports the code is open.
-- **Multi-contract bundles.** When the verified source covers a whole system (more than 30 project files), the analyzer cannot tell which functions belong to the token, so contract findings are capped below DANGER and a note says so.
+- **Multi-contract bundles.** When the verified source covers a whole system (more than 30 project files), the analyzer cannot tell which functions belong to the token. An unrestricted-looking power in such a bundle is reported as INCONCLUSIVE, never as CLEAR and never silently downgraded.
 - **Large or proxy contracts** can take longer and sometimes fail validator consensus. Try again, or paste the source code directly (EVM only).
-- **Honeypot and high-tax detection** relies on GoPlus data. The code path is covered by tests, but it has not been checked against a live honeypot token.
+- **Honeypot and high-tax detection** relies on GoPlus data. Offline tests cover honeypot, high-tax, rugged and liquidity-risk cases with mocked API data, but they have not been run against a live honeypot token.
 - **Solana liquidity locks** can only be checked for pools that issue LP tokens. Concentrated-liquidity pools are reported as partly checked.
 - Market data comes from third-party APIs (GoPlus, RugCheck, Jupiter, DexScreener, CoinGecko). When one is down, the report says that structure was not checked.
 
@@ -70,9 +70,38 @@ npm run dev
 | `CONTRACT_ADDRESS` | Deployed `TokenSecurityScanner` contract on GenLayer Studio |
 | `OPERATOR_PRIVATE_KEY` | Funded account that sends scan transactions |
 
+## Verdict rules
+
+Each of the five contract questions ends as YES, NO or UNCLEAR. Missing, malformed or conflicting model answers count as UNCLEAR. A NO that the code evidence contradicts is changed to UNCLEAR (or YES). The verdict is then computed by fixed rules:
+
+| Verdict | When |
+| --- | --- |
+| DANGER | A YES on a power that sits in an open (unrestricted) function |
+| CENTRALIZED | Two or more YES answers, all behind access checks |
+| CAUTION | One YES answer behind an access check |
+| INCONCLUSIVE | Any UNCLEAR answer, a truncated function map or source excerpt, or a failed source lookup |
+| CLEAR | All five checks answered NO on complete code |
+
+Incomplete analysis can never lower the severity of a real finding and can never produce CLEAR. Unavailable market data (GoPlus, RugCheck and others) is reported as "not verified", not as clean.
+
+## Tests
+
+Offline tests run the contract with mocked network and LLM responses, so they need no network and no GenLayer node:
+
+```bash
+python3 tests/test_verdict_rules.py   # verdict rules and reconciliation
+python3 tests/test_adversarial.py     # unrestricted mint, blacklist, pause, unsafe upgrade, delegatecall,
+                                      # malformed model output, conflicting validators, incomplete source
+python3 tests/test_market.py          # honeypot, high tax, rugged, liquidity risk, unavailable API data
+```
+
+## Frontend execution check
+
+A scan is shown as successful only after the transaction is ACCEPTED or FINALIZED **and** the leader's GenVM execution result in the receipt is not an error. The page then reads the report back from the contract with `get_scan` / `get_solana_scan`. UNDETERMINED transactions and execution errors are shown as failures.
+
 ## Contract
 
-The full intelligent contract is in [`contracts/token_security_scanner_v15.py`](contracts/token_security_scanner_v15.py). To run your own copy, deploy that file to GenLayer Studio and put the deployed address in `CONTRACT_ADDRESS`. The web app in `app/` and `lib/` only relays requests to it and renders the stored result.
+The full intelligent contract is in [`contracts/token_security_scanner_v16.py`](contracts/token_security_scanner_v16.py). To run your own copy, deploy that file to GenLayer Studio and put the deployed address in `CONTRACT_ADDRESS`. The web app in `app/` and `lib/` only relays requests to it and renders the stored result.
 
 ## Contract methods
 

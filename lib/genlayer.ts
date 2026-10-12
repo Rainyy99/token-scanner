@@ -75,6 +75,24 @@ export type StatusResult =
   | { status: "failed"; reason: "undetermined" | "execution_error" | string; detail: string }
   | { status: "done"; result: unknown };
 
+// Reads the leader's execution result from the receipt. Returns "success", "error" or "unknown".
+function executionOutcome(tx: unknown): "success" | "error" | "unknown" {
+  const t = tx as Record<string, any>;
+  const named = String(t?.txExecutionResultName ?? t?.tx_execution_result_name ?? "");
+  if (named === "FINISHED_WITH_ERROR") return "error";
+  const lr = t?.consensus_data?.leader_receipt ?? t?.consensusData?.leaderReceipt;
+  const entries: any[] = Array.isArray(lr) ? lr : lr ? [lr] : [];
+  const leaders = entries.filter((e) => !e?.mode || String(e.mode).toLowerCase() === "leader");
+  let sawSuccess = named === "FINISHED_WITH_RETURN";
+  for (const e of leaders) {
+    const r = String(e?.execution_result ?? e?.executionResult ?? "").toUpperCase();
+    const st = String(e?.result?.status ?? "").toLowerCase();
+    if (r === "ERROR" || st === "contract_error" || st === "error") return "error";
+    if (r === "SUCCESS" || st === "return" || st === "success") sawSuccess = true;
+  }
+  return sawSuccess ? "success" : "unknown";
+}
+
 export async function checkScanStatus(
   txHash: string,
   chainId: number | "solana",
@@ -111,11 +129,14 @@ export async function checkScanStatus(
     };
   }
 
-  if (tx.txExecutionResultName === "FINISHED_WITH_ERROR") {
+  // Accepted/Finalized only means validators reached consensus; the contract call itself may still
+  // have errored. The authoritative signal is the leader's execution result in the receipt.
+  const exec = executionOutcome(tx);
+  if (exec === "error") {
     return {
       status: "failed",
       reason: "execution_error",
-      detail: "Contract execution failed.",
+      detail: "The GenVM execution of this scan failed, so no report was recorded.",
     };
   }
 
