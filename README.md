@@ -99,6 +99,18 @@ python3 tests/test_market.py          # honeypot, high tax, rugged, liquidity ri
 
 A scan is shown as successful only after the transaction is ACCEPTED or FINALIZED **and** the leader's GenVM execution result in the receipt is not an error. The page then reads the report back from the contract with `get_scan` / `get_solana_scan`. UNDETERMINED transactions and execution errors are shown as failures.
 
+## Deployment and evidence
+
+Deployed contract (GenLayer Studio, `get_version` returns `"v16"`): `0xdb54C5495d3824b0A10117A7977FC4b7233eE356`
+
+The live web app uses this same address (`CONTRACT_ADDRESS`). Each scan below was sent from the web app, reached FINALIZED with a successful GenVM execution, and was then read back from the contract with `get_scan` / `get_solana_scan`.
+
+| Token | Method | Transaction (FINALIZED) | Readback |
+| --- | --- | --- | --- |
+| UNI, Ethereum (1) `0x1f9840a85d5aF5bf1D1762F925BDADdC4201F984` | `scan_token_full` | `0xae198c3b38014ea8d3a13d37af2156be4406357ab644dc90896e69f218ddee29` | contract verdict CAUTION (mint power behind an access check; low-level calls UNCLEAR, reported as "check not settled") |
+| USDC, Base (8453) `0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913` | `scan_token_full` | `0x996b9cdfa7e60722fc4c191df475c06bfe34401330b72455b9df7b9c07d3d1ac` | proxy followed to `0x2Ce6311ddAE708829bc0784C967b7d77D19FD779`; contract verdict CENTRALIZED (mint, blacklist, pause and upgrade found, low-level calls UNCLEAR); headline STABLECOIN with the incomplete-check note |
+| JUP, Solana `JUPyiwrYJFskUPiHa7hkeR8VUtAeFoSYbKedZNsDvCN` | `scan_solana_token` | `0xa4aaaad4cd4f9c35ba9cf0b66df130176b5d186bcf48cddbbb86e600d9e35ac8` | headline NO RED FLAGS FOUND, established token, liquidity lock only partly checkable |
+
 ## Contract
 
 The full intelligent contract is in [`contracts/token_security_scanner_v16.py`](contracts/token_security_scanner_v16.py). To run your own copy, deploy that file to GenLayer Studio and put the deployed address in `CONTRACT_ADDRESS`. The web app in `app/` and `lib/` only relays requests to it and renders the stored result.
