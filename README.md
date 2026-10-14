@@ -114,24 +114,26 @@ A scan is shown as successful only after the transaction is ACCEPTED or FINALIZE
 
 ## Deployment and evidence
 
-**Reproducible evidence.** `scripts/collect-evidence.mjs` reads every transaction listed in `evidence/scans.json` from the chain (consensus status and the leader's GenVM execution result) and reads the report back from the deployed contract, writing the raw JSON to `evidence/readbacks/` and a table to `evidence/SUMMARY.md`:
+Deployed contract (GenLayer Studio, `get_version` returns `"v17"`): `0x9c1c5088048cC35B40C56e7dc9EF2346bC083151`
+
+The live web app uses this same address (`CONTRACT_ADDRESS`). Each scan below was sent from the web app, reached FINALIZED with a successful GenVM execution, and the report was read back from the contract.
+
+**Reproducible evidence.** `scripts/collect-evidence.mjs` reads every transaction listed in `evidence/scans.json` from the chain (consensus status and the leader's GenVM execution result) and reads the report back from the deployed contract. Raw output is committed in [`evidence/readbacks/`](evidence/readbacks) and summarized in [`evidence/SUMMARY.md`](evidence/SUMMARY.md). To reproduce:
 
 ```bash
 npm install
-CONTRACT_ADDRESS=0x... node scripts/collect-evidence.mjs
+CONTRACT_ADDRESS=0x9c1c5088048cC35B40C56e7dc9EF2346bC083151 node scripts/collect-evidence.mjs
 ```
 
-**Previous deployment (v16, superseded by v17, kept for reference).** Deployed contract (GenLayer Studio, `get_version` returned `"v16"`): `0xdb54C5495d3824b0A10117A7977FC4b7233eE356` Its source is at git commit `d68fad2`.
-
-The live web app uses this same address (`CONTRACT_ADDRESS`). Each scan below was sent from the web app, reached FINALIZED with a successful GenVM execution, and was then read back from the contract with `get_scan` / `get_solana_scan`.
-
-| Token | Method | Transaction (FINALIZED) | Readback |
+| Token | Method | Transaction (FINALIZED, GenVM SUCCESS) | Report |
 | --- | --- | --- | --- |
-| UNI, Ethereum (1) `0x1f9840a85d5aF5bf1D1762F925BDADdC4201F984` | `scan_token_full` | `0xae198c3b38014ea8d3a13d37af2156be4406357ab644dc90896e69f218ddee29` | contract verdict CAUTION (mint power behind an access check; low-level calls UNCLEAR, reported as "check not settled") |
-| USDC, Base (8453) `0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913` | `scan_token_full` | `0x996b9cdfa7e60722fc4c191df475c06bfe34401330b72455b9df7b9c07d3d1ac` | proxy followed to `0x2Ce6311ddAE708829bc0784C967b7d77D19FD779`; contract verdict CENTRALIZED (mint, blacklist, pause and upgrade found, low-level calls UNCLEAR); headline STABLECOIN with the incomplete-check note |
-| JUP, Solana `JUPyiwrYJFskUPiHa7hkeR8VUtAeFoSYbKedZNsDvCN` | `scan_solana_token` | `0xa4aaaad4cd4f9c35ba9cf0b66df130176b5d186bcf48cddbbb86e600d9e35ac8` | headline NO RED FLAGS FOUND, established token, liquidity lock only partly checkable |
+| UNI, Ethereum (1) `0x1f9840a85d5aF5bf1D1762F925BDADdC4201F984` | `scan_token_full` | `0x3433dcfcb4673ce682426ffd0f75579a853b973b79770dd8454112b2f0a95788` | contract verdict CAUTION (mint behind an access check); privileged low-level calls UNCLEAR, reported as "check not settled" |
+| USDC, Base (8453) `0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913` | `scan_token_full` | `0x518d28feea305213133fde8d3f6570588c8f0fbde2c704996945402231661fc9` | proxy followed to `0x2Ce6311ddAE708829bc0784C967b7d77D19FD779`; contract verdict CENTRALIZED; headline STABLECOIN |
+| JUP, Solana `JUPyiwrYJFskUPiHa7hkeR8VUtAeFoSYbKedZNsDvCN` | `scan_solana_token` | `0xfb954dd05936a4e495c68ebff756f8ac6e18804d46cee17f0130346ce5424fed` | headline NO RED FLAGS FOUND, established token, liquidity lock only partly checkable |
 
-Screenshots of the live app after each scan (results rendered from the contract readback) are in [`docs/screenshots`](docs/screenshots): [UNI](docs/screenshots/ui-uni-ethereum.jpg), [USDC on Base](docs/screenshots/ui-usdc-base.jpg), [JUP on Solana](docs/screenshots/ui-jup-solana.jpg), and Studio showing the deployed contract returning [`v16`](docs/screenshots/studio-get-version-v16.jpg).
+Screenshots of the live app for these scans are in [`docs/screenshots/v17`](docs/screenshots/v17): [UNI](docs/screenshots/v17/ui-uni-ethereum.jpg), [USDC on Base](docs/screenshots/v17/ui-usdc-base.jpg), [JUP on Solana](docs/screenshots/v17/ui-jup-solana.jpg).
+
+*Earlier deployment (v16, superseded):* `0xdb54C5495d3824b0A10117A7977FC4b7233eE356`, source at git commit `d68fad2`. Its screenshots are in `docs/screenshots`.
 
 ## Contract
 
