@@ -1,0 +1,170 @@
+{
+  "contract": "0x9c1c5088048cC35B40C56e7dc9EF2346bC083151",
+  "version": "v17",
+  "label": "unproven-robinhood",
+  "tx": "0x487da66815c698eb41d75b93b0dc6ffbcacbd781307297cca856bca1af4c4911",
+  "status": "FINALIZED",
+  "leader_entries": [
+    {
+      "mode": "leader",
+      "execution_result": "SUCCESS",
+      "result_status": "return"
+    },
+    {
+      "mode": "validator",
+      "execution_result": "ERROR",
+      "result_status": "contract_error"
+    }
+  ],
+  "execution_confirmed": true,
+  "readback_method": "get_scan",
+  "readback_args": [
+    4663,
+    "0x977689834cb1822Ea31D80307303a76AaA313368"
+  ],
+  "scan": {
+    "analyzed_address": "0x977689834cb1822Ea31D80307303a76AaA313368",
+    "chain_id": 4663,
+    "final": {
+      "contract_verdict": "CLEAR",
+      "counts": {
+        "caution": 1,
+        "danger": 0,
+        "info": 0,
+        "warn": 0
+      },
+      "disclaimer": "Automated analysis. Not financial advice and not a guarantee.",
+      "flags": [
+        {
+          "code": "honeypot_unverified",
+          "level": "caution",
+          "text": "Honeypot status could not be verified, so selling may not be possible"
+        }
+      ],
+      "headline": "CAUTION",
+      "notes": [],
+      "profile": "unproven",
+      "profile_label": "Unproven token",
+      "subline": "Unproven token.",
+      "tone": "caution"
+    },
+    "incomplete": [],
+    "input_address": "0x977689834cb1822Ea31D80307303a76AaA313368",
+    "is_proxy": false,
+    "llm_findings": {
+      "blacklist_or_freeze": {
+        "answer": "NO",
+        "function": "",
+        "reason": "No blacklist or freeze function"
+      },
+      "hidden_privileged_calls": {
+        "answer": "NO",
+        "function": "",
+        "reason": "No privileged low‑level external calls"
+      },
+      "pause_transfers": {
+        "answer": "NO",
+        "function": "",
+        "reason": "No pause function found"
+      },
+      "unrestricted_mint": {
+        "answer": "NO",
+        "function": "",
+        "reason": "No mint function in contract"
+      },
+      "upgrade_without_timelock": {
+        "answer": "NO",
+        "function": "",
+        "reason": "Contract not upgradeable, no proxy"
+      }
+    },
+    "llm_parse_ok": true,
+    "llm_raw_excerpt": "{\"unrestricted_mint\":{\"answer\":\"NO\",\"function\":\"\",\"reason\":\"No mint function in contract\"},\"blacklist_or_freeze\":{\"answer\":\"NO\",\"function\":\"\",\"reason\":\"No blacklist or freeze function\"},\"pause_transfers\":{\"answer\":\"NO\",\"function\":\"\",\"reason\":\"No pause function found\"},\"upgrade_without_timelock\":{\"an",
+    "market": {
+      "available": true,
+      "concentration": "LOW",
+      "flags": [
+        {
+          "code": "honeypot_unverified",
+          "level": "caution",
+          "text": "Honeypot status could not be verified, so selling may not be possible"
+        }
+      ],
+      "graduated": null,
+      "holders": "1k-10k",
+      "in_contracts": "20-30%",
+      "launchpad": false,
+      "locked": "0-10%",
+      "top_wallets": "20-30%",
+      "worst": "caution"
+    },
+    "profile": {
+      "age_months": null,
+      "label": "Unproven token",
+      "lookalike": false,
+      "profile": "unproven",
+      "reasons": [
+        "Not enough independent signals to call it established"
+      ]
+    },
+    "proxy_type": "None",
+    "reason": "",
+    "review": {
+      "access": {
+        "blacklist_or_freeze": "none",
+        "hidden_privileged_calls": "none",
+        "pause_transfers": "none",
+        "unrestricted_mint": "none",
+        "upgrade_without_timelock": "none"
+      },
+      "access_fns": {
+        "blacklist_or_freeze": [],
+        "hidden_privileged_calls": [],
+        "pause_transfers": [],
+        "unrestricted_mint": [],
+        "upgrade_without_timelock": []
+      },
+      "external_calls": [],
+      "flags": {
+        "assembly": 0,
+        "delegatecall": 0,
+        "selfdestruct": 0,
+        "tx.origin": 0
+      },
+      "functions_public_nonview": 0,
+      "functions_total": 0,
+      "functions_view": 0,
+      "gaps": [],
+      "gated_fns": [],
+      "library_files": 8,
+      "library_risky": [],
+      "map": "",
+      "map_truncated": false,
+      "open_evidence": {
+        "blacklist_or_freeze": [],
+        "hidden_privileged_calls": [],
+        "pause_transfers": [],
+        "unrestricted_mint": [],
+        "upgrade_without_timelock": []
+      },
+      "open_fns": [],
+      "pause_ctrl": [],
+      "pause_gated": [],
+      "pause_gated_count": 0,
+      "payable_fns": [],
+      "project_chars": 2976,
+      "project_files": 1,
+      "risky_count": 0,
+      "risky_names": [],
+      "snippets": "",
+      "snippets_truncated": false,
+      "upgrade_markers": [
+        "beaconproxy.sol"
+      ]
+    },
+    "source": "sourcify",
+    "today": "2026-10-14",
+    "verdict": "CLEAR",
+    "verified": true
+  }
+}
