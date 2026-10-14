@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { checkScanStatus } from "@/lib/genlayer";
+import { checkScanStatus, describeExecution } from "@/lib/genlayer";
 import { parseChainRef, addressFitsChain } from "@/lib/validate";
 
 export async function GET(req: NextRequest) {
@@ -10,6 +10,13 @@ export async function GET(req: NextRequest) {
 
   if (!txHash || !txHash.startsWith("0x")) {
     return NextResponse.json({ error: "invalid_hash", message: "hash query param is required." }, { status: 400 });
+  }
+  if (searchParams.get("debug") === "1") {
+    try {
+      return NextResponse.json(await describeExecution(txHash));
+    } catch (e) {
+      return NextResponse.json({ error: "debug_failed", message: String(e) }, { status: 502 });
+    }
   }
   const chain = parseChainRef(chainIdRaw);
   if (chain === null) {

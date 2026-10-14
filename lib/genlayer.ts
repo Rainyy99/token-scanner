@@ -73,7 +73,7 @@ export async function submitScanPastedCode(
 export type StatusResult =
   | { status: "pending"; statusName?: string }
   | { status: "failed"; reason: "undetermined" | "execution_error" | string; detail: string }
-  | { status: "done"; result: unknown };
+  | { status: "done"; result: unknown; execution: "success" };
 
 // Reads the leader's execution result from the receipt. Returns "success", "error" or "unknown".
 function executionOutcome(tx: unknown): "success" | "error" | "unknown" {
@@ -91,6 +91,22 @@ function executionOutcome(tx: unknown): "success" | "error" | "unknown" {
     if (r === "SUCCESS" || st === "return" || st === "success") sawSuccess = true;
   }
   return sawSuccess ? "success" : "unknown";
+}
+
+// Read-only description of how a transaction's execution was judged (for /api/scan/status?debug=1).
+export async function describeExecution(txHash: string) {
+  const tx = (await getReadClient().getTransaction({ hash: txHash as never })) as Record<string, any>;
+  const lr = tx?.consensus_data?.leader_receipt ?? tx?.consensusData?.leaderReceipt;
+  const entries: any[] = Array.isArray(lr) ? lr : lr ? [lr] : [];
+  return {
+    statusName: tx?.statusName ?? null,
+    outcome: executionOutcome(tx),
+    leader_entries: entries.map((e) => ({
+      mode: e?.mode ?? null,
+      execution_result: e?.execution_result ?? e?.executionResult ?? null,
+      result_status: e?.result?.status ?? null,
+    })),
+  };
 }
 
 export async function checkScanStatus(
@@ -139,6 +155,14 @@ export async function checkScanStatus(
       detail: "The GenVM execution of this scan failed, so no report was recorded.",
     };
   }
+  if (exec !== "success") {
+    // Never treat an unknown outcome as success: stored state could belong to an older scan.
+    return {
+      status: "failed",
+      reason: "execution_unconfirmed",
+      detail: "The GenVM execution result of this transaction could not be confirmed, so the report is not shown.",
+    };
+  }
 
   if (!CONTRACT_ADDRESS) {
     return { status: "failed", reason: "config_error", detail: "CONTRACT_ADDRESS is not set" };
@@ -161,7 +185,7 @@ export async function checkScanStatus(
     return { status: "failed", reason: "parse_failed", detail: "Could not parse scan result." };
   }
 
-  return { status: "done", result: parsed };
+  return { status: "done", result: parsed, execution: "success" };
 }
 
 // ---- History (recent scans, shared by all visitors) ----
