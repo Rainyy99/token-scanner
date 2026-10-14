@@ -130,6 +130,7 @@ CONTRACT_ADDRESS=0x9c1c5088048cC35B40C56e7dc9EF2346bC083151 node scripts/collect
 | UNI, Ethereum (1) `0x1f9840a85d5aF5bf1D1762F925BDADdC4201F984` | `scan_token_full` | `0x3433dcfcb4673ce682426ffd0f75579a853b973b79770dd8454112b2f0a95788` | contract verdict CAUTION (mint behind an access check); privileged low-level calls UNCLEAR, reported as "check not settled" |
 | USDC, Base (8453) `0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913` | `scan_token_full` | `0x518d28feea305213133fde8d3f6570588c8f0fbde2c704996945402231661fc9` | proxy followed to `0x2Ce6311ddAE708829bc0784C967b7d77D19FD779`; contract verdict CENTRALIZED; headline STABLECOIN |
 | JUP, Solana `JUPyiwrYJFskUPiHa7hkeR8VUtAeFoSYbKedZNsDvCN` | `scan_solana_token` | `0xfb954dd05936a4e495c68ebff756f8ac6e18804d46cee17f0130346ce5424fed` | headline NO RED FLAGS FOUND, established token, liquidity lock only partly checkable |
+| Unproven token, Robinhood Chain (4663) `0x977689834cb1822Ea31D80307303a76AaA313368` | `scan_token_full` | `0x487da66815c698eb41d75b93b0dc6ffbcacbd781307297cca856bca1af4c4911` | headline CAUTION: honeypot status could not be verified (no data from the market source), reported as unverified and not as safe; contract checks found no minting power |
 
 Screenshots of the live app for these scans are in [`docs/screenshots/v17`](docs/screenshots/v17): [UNI](docs/screenshots/v17/ui-uni-ethereum.jpg), [USDC on Base](docs/screenshots/v17/ui-usdc-base.jpg), [JUP on Solana](docs/screenshots/v17/ui-jup-solana.jpg).
 
