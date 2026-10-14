@@ -1,0 +1,240 @@
+{
+  "contract": "0x9c1c5088048cC35B40C56e7dc9EF2346bC083151",
+  "version": "v17",
+  "label": "usdc-base",
+  "tx": "0x518d28feea305213133fde8d3f6570588c8f0fbde2c704996945402231661fc9",
+  "status": "FINALIZED",
+  "leader_entries": [
+    {
+      "mode": "leader",
+      "execution_result": "SUCCESS",
+      "result_status": "return"
+    },
+    {
+      "mode": "validator",
+      "execution_result": "SUCCESS",
+      "result_status": "return"
+    }
+  ],
+  "execution_confirmed": true,
+  "readback_method": "get_scan",
+  "readback_args": [
+    8453,
+    "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913"
+  ],
+  "scan": {
+    "analyzed_address": "0x2Ce6311ddAE708829bc0784C967b7d77D19FD779",
+    "chain_id": 8453,
+    "final": {
+      "contract_verdict": "CENTRALIZED",
+      "counts": {
+        "caution": 0,
+        "danger": 0,
+        "info": 0,
+        "warn": 0
+      },
+      "disclaimer": "Automated analysis. Not financial advice and not a guarantee.",
+      "flags": [],
+      "headline": "STABLECOIN",
+      "notes": [],
+      "profile": "stablecoin",
+      "profile_label": "Stablecoin",
+      "subline": "Stablecoin. Address matches the issuer's official contract; the current peg is not checked.",
+      "tone": "neutral"
+    },
+    "incomplete": [],
+    "input_address": "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
+    "is_proxy": true,
+    "llm_findings": {
+      "blacklist_or_freeze": {
+        "answer": "YES",
+        "function": "blacklist",
+        "reason": "The blacklist function allows the blacklister to block specific addresses from transactions."
+      },
+      "hidden_privileged_calls": {
+        "answer": "YES",
+        "function": "upgradeToAndCall",
+        "reason": "A low-level call is executed to an arbitrary address during the upgrade process."
+      },
+      "pause_transfers": {
+        "answer": "YES",
+        "function": "pause",
+        "reason": "The pause function allows the pauser to halt all token transfers."
+      },
+      "unrestricted_mint": {
+        "answer": "YES",
+        "function": "mint",
+        "reason": "The mint function allows minters to increase the total supply of tokens."
+      },
+      "upgrade_without_timelock": {
+        "answer": "YES",
+        "function": "upgradeTo",
+        "reason": "The contract is a proxy and the admin can upgrade logic immediately."
+      }
+    },
+    "llm_parse_ok": true,
+    "llm_raw_excerpt": "{\n  \"unrestricted_mint\": {\n    \"answer\": \"YES\",\n    \"function\": \"mint\",\n    \"reason\": \"The mint function allows minters to increase the total supply of tokens.\"\n  },\n  \"blacklist_or_freeze\": {\n    \"answer\": \"YES\",\n    \"function\": \"blacklist\",\n    \"reason\": \"The blacklist function allows the blacklis",
+    "market": {
+      "available": true,
+      "concentration": "LOW",
+      "flags": [],
+      "graduated": null,
+      "holders": ">100k",
+      "in_contracts": "0-10%",
+      "launchpad": false,
+      "locked": "0-10%",
+      "top_wallets": "10-20%",
+      "worst": "none"
+    },
+    "profile": {
+      "age_months": null,
+      "label": "Stablecoin",
+      "lookalike": false,
+      "profile": "stablecoin",
+      "reasons": [
+        "USDC at an address on our verified list"
+      ]
+    },
+    "proxy_type": "ZeppelinOSProxy",
+    "reason": "",
+    "review": {
+      "access": {
+        "blacklist_or_freeze": "gated",
+        "hidden_privileged_calls": "none",
+        "pause_transfers": "gated",
+        "unrestricted_mint": "gated",
+        "upgrade_without_timelock": "gated"
+      },
+      "access_fns": {
+        "blacklist_or_freeze": [
+          "blacklist",
+          "unBlacklist",
+          "updateBlacklister"
+        ],
+        "hidden_privileged_calls": [],
+        "pause_transfers": [
+          "pause",
+          "unpause",
+          "updatePauser"
+        ],
+        "unrestricted_mint": [
+          "mint",
+          "configureMinter",
+          "removeMinter",
+          "updateMasterMinter"
+        ],
+        "upgrade_without_timelock": [
+          "upgradeTo",
+          "upgradeToAndCall"
+        ]
+      },
+      "external_calls": [],
+      "flags": {
+        "assembly": 10,
+        "delegatecall": 1,
+        "selfdestruct": 0,
+        "tx.origin": 0
+      },
+      "functions_public_nonview": 38,
+      "functions_total": 108,
+      "functions_view": 16,
+      "gaps": [],
+      "gated_fns": [
+        "rescueERC20",
+        "updateRescuer",
+        "blacklist",
+        "unBlacklist",
+        "updateBlacklister",
+        "mint",
+        "approve",
+        "configureMinter",
+        "removeMinter",
+        "burn",
+        "updateMasterMinter",
+        "transferOwnership",
+        "pause",
+        "unpause",
+        "updatePauser",
+        "increaseAllowance",
+        "decreaseAllowance",
+        "receiveWithAuthorization",
+        "permit",
+        "initializeV2_1",
+        "initializeV2_2",
+        "changeAdmin",
+        "upgradeTo",
+        "upgradeToAndCall"
+      ],
+      "library_files": 5,
+      "library_risky": [],
+      "map": "Rescuable.sol:rescueERC20[external,nonpayable|onlyRescuer]\nRescuable.sol:updateRescuer[external,nonpayable|onlyOwner]\nBlacklistable.sol:blacklist[external,nonpayable|onlyBlacklister]\nBlacklistable.sol:unBlacklist[external,nonpayable|onlyBlacklister]\nBlacklistable.sol:updateBlacklister[external,nonpayable|onlyOwner]\nFiatTokenV1.sol:initialize[public,nonpayable|]\nFiatTokenV1.sol:mint[external,nonpayable|whenNotPaused,onlyMinters,notBlacklisted,notBlacklisted]\nFiatTokenV1.sol:approve[external,nonpayable|whenNotPaused,notBlacklisted,notBlacklisted]\nFiatTokenV1.sol:transferFrom[external,nonpayable|whenNotPaused,notBlacklisted,notBlacklisted,notBlacklisted]\nFiatTokenV1.sol:transfer[external,nonpayable|whenNotPaused,notBlacklisted,notBlacklisted]\nFiatTokenV1.sol:configureMinter[external,nonpayable|whenNotPaused,onlyMasterMinter]\nFiatTokenV1.sol:removeMinter[external,nonpayable|onlyMasterMinter]\nFiatTokenV1.sol:burn[external,nonpayable|whenNotPaused,onlyMinters,notBlacklisted]\nFiatTokenV1.sol:updateMasterMinter[external,nonpayable|onlyOwner]\nOwnable.sol:transferOwnership[external,nonpayable|onlyOwner]\nPausable.sol:pause[external,nonpayable|onlyPauser]\nPausable.sol:unpause[external,nonpayable|onlyPauser]\nPausable.sol:updatePauser[external,nonpayable|onlyOwner]\nFiatTokenV2.sol:initializeV2[external,nonpayable|]\nFiatTokenV2.sol:increaseAllowance[external,nonpayable|whenNotPaused,notBlacklisted,notBlacklisted]\nFiatTokenV2.sol:decreaseAllowance[external,nonpayable|whenNotPaused,notBlacklisted,notBlacklisted]\nFiatTokenV2.sol:transferWithAuthorization[external,nonpayable|whenNotPaused,notBlacklisted,notBlacklisted]\nFiatTokenV2.sol:receiveWithAuthorization[external,nonpayable|whenNotPaused,notBlacklisted,notBlacklisted]\nFiatTokenV2.sol:cancelAuthorization[external,nonpayable|whenNotPaused]\nFiatTokenV2.sol:permit[external,nonpayable|whenNotPaused,notBlacklisted,notBlacklisted]\nFiatTokenV2_1.sol:initializeV2_1[external,nonpayable|]\nFiatTokenV2_2.sol:initializeV2_2[external,nonpayable|]\nFiatTokenV2_2.sol:permit[external,nonpayable|whenNotPaused]\nFiatTokenV2_2.sol:transferWithAuthorization[external,nonpayable|whenNotPaused,notBlacklisted,notBlacklisted]\nFiatTokenV2_2.sol:receiveWithAuthorization[external,nonpayable|whenNotPaused,notBlacklisted,notBlacklisted]\nFiatTokenV2_2.sol:cancelAuthorization[external,nonpayable|whenNotPaused]\nFiatTokenV2_2.sol:approve[external,nonpayable|whenNotPaused]\nFiatTokenV2_2.sol:permit[external,nonpayable|whenNotPaused]\nFiatTokenV2_2.sol:increaseAllowance[external,nonpayable|whenNotPaused]\nFiatTokenV2_2.sol:decreaseAllowance[external,nonpayable|whenNotPaused]\nAdminUpgradeabilityProxy.sol:changeAdmin[external,nonpayable|ifAdmin]\nAdminUpgradeabilityProxy.sol:upgradeTo[external,nonpayable|ifAdmin]\nAdminUpgradeabilityProxy.sol:upgradeToAndCall[external,payable|ifAdmin]",
+      "map_truncated": false,
+      "open_evidence": {
+        "blacklist_or_freeze": [],
+        "hidden_privileged_calls": [],
+        "pause_transfers": [],
+        "unrestricted_mint": [],
+        "upgrade_without_timelock": []
+      },
+      "open_fns": [
+        "initialize",
+        "transferFrom",
+        "transfer",
+        "initializeV2",
+        "transferWithAuthorization",
+        "cancelAuthorization"
+      ],
+      "pause_ctrl": [
+        "pause",
+        "unpause"
+      ],
+      "pause_gated": [
+        "mint",
+        "approve",
+        "transferFrom",
+        "transfer",
+        "configureMinter",
+        "burn",
+        "increaseAllowance",
+        "decreaseAllowance",
+        "transferWithAuthorization",
+        "receiveWithAuthorization",
+        "cancelAuthorization",
+        "permit"
+      ],
+      "pause_gated_count": 12,
+      "payable_fns": [
+        "upgradeToAndCall"
+      ],
+      "project_chars": 94574,
+      "project_files": 23,
+      "risky_count": 17,
+      "risky_names": [
+        "Rescuable.sol:rescueERC20",
+        "Rescuable.sol:updateRescuer",
+        "Blacklistable.sol:blacklist",
+        "Blacklistable.sol:unBlacklist",
+        "Blacklistable.sol:updateBlacklister",
+        "FiatTokenV1.sol:mint",
+        "FiatTokenV1.sol:configureMinter",
+        "FiatTokenV1.sol:removeMinter",
+        "FiatTokenV1.sol:burn",
+        "FiatTokenV1.sol:updateMasterMinter",
+        "Ownable.sol:transferOwnership",
+        "Pausable.sol:pause",
+        "Pausable.sol:unpause",
+        "Pausable.sol:updatePauser",
+        "AdminUpgradeabilityProxy.sol:changeAdmin",
+        "AdminUpgradeabilityProxy.sol:upgradeTo",
+        "AdminUpgradeabilityProxy.sol:upgradeToAndCall"
+      ],
+      "snippets": "Rescuable.sol:rescueERC20 external onlyRescuer {tokenContract.safeTransfer(to, amount);}\nRescuable.sol:updateRescuer external onlyOwner {require( newRescuer != address(0), \" \" ); _rescuer = newRescuer; emit RescuerChanged(newRescuer);}\nBlacklistable.sol:blacklist external onlyBlacklister {_blacklist(_account); emit Blacklisted(_account);}\nBlacklistable.sol:unBlacklist external onlyBlacklister {_unBlacklist(_account); emit UnBlacklisted(_account);}\nBlacklistable.sol:updateBlacklister external onlyOwner {require( _newBlacklister != address(0), \" \" ); blacklister = _newBlacklister; emit BlacklisterChanged(blacklister);}\nFiatTokenV1.sol:mint external whenNotPaused onlyMinters notBlacklisted(msg.sender) notBlacklisted(_to) returns (bool) {require(_to != address(0), \" \"); require(_amount > 0, \" \"); uint256 mintingAllowedAmount = minterAllowed[msg.sender]; require( _amount <= mintingAllowedAmount, \" \" ); totalSupply_ = totalSupply_.add(_amount); _setBalance(_to, _balanceOf(_to).add(_amount)); minterAllowed[msg.sender] = mintingAllowedAmount.sub(_amount); emit Mint(msg.sender, _to, _amount); emit Transfer(address(0), _to, _amount); return true;}\nFiatTokenV1.sol:configureMinter external whenNotPaused onlyMasterMinter returns (bool) {minters[minter] = true; minterAllowed[minter] = minterAllowedAmount; emit MinterConfigured(minter, minterAllowedAmount); return true;}\nFiatTokenV1.sol:removeMinter external onlyMasterMinter returns (bool) {minters[minter] = false; minterAllowed[minter] = 0; emit MinterRemoved(minter); return true;}\nFiatTokenV1.sol:burn external whenNotPaused onlyMinters notBlacklisted(msg.sender) {uint256 balance = _balanceOf(msg.sender); require(_amount > 0, \" \"); require(balance >= _amount, \" \"); totalSupply_ = totalSupply_.sub(_amount); _setBalance(msg.sender, balance.sub(_amount)); emit Burn(msg.sender, _amount); emit Transfer(msg.sender, address(0), _amount);}\nFiatTokenV1.sol:updateMasterMinter external onlyOwner {require( _newMasterMinter != address(0), \" \" ); masterMinter = _newMasterMinter; emit MasterMinterChanged(masterMinter);}\nOwnable.sol:transferOwnership external onlyOwner {require( newOwner != address(0), \" \" ); emit OwnershipTransferred(_owner, newOwner); setOwner(newOwner);}\nPausable.sol:pause external onlyPauser {paused = true; emit Pause();}\nPausable.sol:unpause external onlyPauser {paused = false; emit Unpause();}\nPausable.sol:updatePauser external onlyOwner {require( _newPauser != address(0), \" \" ); pauser = _newPauser; emit PauserChanged(pauser);}\nAdminUpgradeabilityProxy.sol:changeAdmin external ifAdmin {require( newAdmin != address(0), \" \" ); emit AdminChanged(_admin(), newAdmin); _setAdmin(newAdmin);}\nAdminUpgradeabilityProxy.sol:upgradeTo external ifAdmin {_upgradeTo(newImplementation);}\nAdminUpgradeabilityProxy.sol:upgradeToAndCall external payable ifAdmin {_upgradeTo(newImplementation); (bool success,) = address(this).call{value: msg.value}(data); require(success);}",
+      "snippets_truncated": false,
+      "upgrade_markers": []
+    },
+    "source": "sourcify",
+    "today": "2026-10-14",
+    "verdict": "CENTRALIZED",
+    "verified": true
+  }
+}

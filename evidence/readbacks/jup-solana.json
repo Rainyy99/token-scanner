@@ -1,0 +1,98 @@
+{
+  "contract": "0x9c1c5088048cC35B40C56e7dc9EF2346bC083151",
+  "version": "v17",
+  "label": "jup-solana",
+  "tx": "0xfb954dd05936a4e495c68ebff756f8ac6e18804d46cee17f0130346ce5424fed",
+  "status": "FINALIZED",
+  "leader_entries": [
+    {
+      "mode": "leader",
+      "execution_result": "SUCCESS",
+      "result_status": "return"
+    },
+    {
+      "mode": "validator",
+      "execution_result": "ERROR",
+      "result_status": "contract_error"
+    }
+  ],
+  "execution_confirmed": true,
+  "readback_method": "get_solana_scan",
+  "readback_args": [
+    "JUPyiwrYJFskUPiHa7hkeR8VUtAeFoSYbKedZNsDvCN"
+  ],
+  "scan": {
+    "chain_id": "solana",
+    "final": {
+      "contract_verdict": "CLEAR",
+      "counts": {
+        "caution": 0,
+        "danger": 0,
+        "info": 3,
+        "warn": 0
+      },
+      "disclaimer": "Automated analysis. Not financial advice and not a guarantee.",
+      "flags": [],
+      "headline": "NO RED FLAGS FOUND",
+      "notes": [
+        "Token metadata can still be changed",
+        "The top 10 holders hold 60-70% of supply (pools, lockers and burn addresses excluded)",
+        "The lock status can only be checked for part of the liquidity (pools without LP tokens, such as concentrated-liquidity pools, cannot be checked)"
+      ],
+      "profile": "established",
+      "profile_label": "Established token",
+      "subline": "Established token.",
+      "tone": "positive"
+    },
+    "input_address": "JUPyiwrYJFskUPiHa7hkeR8VUtAeFoSYbKedZNsDvCN",
+    "market": {
+      "available": true,
+      "concentration": "HIGH",
+      "dex_paid": false,
+      "flags": [
+        {
+          "code": "metadata_mutable",
+          "level": "info",
+          "text": "Token metadata can still be changed"
+        },
+        {
+          "code": "concentration",
+          "level": "info",
+          "text": "The top 10 holders hold 60-70% of supply (pools, lockers and burn addresses excluded)"
+        },
+        {
+          "code": "liquidity_lock_partial",
+          "level": "info",
+          "text": "The lock status can only be checked for part of the liquidity (pools without LP tokens, such as concentrated-liquidity pools, cannot be checked)"
+        }
+      ],
+      "holders": "10000+",
+      "insiders": "0",
+      "launchpad": null,
+      "lp_coverage": "10-50",
+      "lp_locked": "0-10",
+      "markets": [
+        "fluxbeam",
+        "meteora",
+        "meteoraDlmm",
+        "meteora_damm_v2",
+        "orca",
+        "pump_fun_amm"
+      ],
+      "top10": "60-70",
+      "worst": "info"
+    },
+    "profile": {
+      "age_months": 32,
+      "label": "Established token",
+      "lookalike": false,
+      "profile": "established",
+      "reasons": [
+        "Reputation, holder base and contract checks all met"
+      ]
+    },
+    "source": "solana",
+    "today": "2026-10-14",
+    "verdict": "CLEAR"
+  }
+}

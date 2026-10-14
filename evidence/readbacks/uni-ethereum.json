@@ -1,0 +1,189 @@
+{
+  "contract": "0x9c1c5088048cC35B40C56e7dc9EF2346bC083151",
+  "version": "v17",
+  "label": "uni-ethereum",
+  "tx": "0x3433dcfcb4673ce682426ffd0f75579a853b973b79770dd8454112b2f0a95788",
+  "status": "FINALIZED",
+  "leader_entries": [
+    {
+      "mode": "leader",
+      "execution_result": "SUCCESS",
+      "result_status": "return"
+    },
+    {
+      "mode": "validator",
+      "execution_result": "SUCCESS",
+      "result_status": "return"
+    }
+  ],
+  "execution_confirmed": true,
+  "readback_method": "get_scan",
+  "readback_args": [
+    1,
+    "0x1f9840a85d5aF5bf1D1762F925BDADdC4201F984"
+  ],
+  "scan": {
+    "analyzed_address": "0x1f9840a85d5aF5bf1D1762F925BDADdC4201F984",
+    "chain_id": 1,
+    "final": {
+      "contract_verdict": "CAUTION",
+      "counts": {
+        "caution": 0,
+        "danger": 0,
+        "info": 2,
+        "warn": 0
+      },
+      "disclaimer": "Automated analysis. Not financial advice and not a guarantee.",
+      "flags": [],
+      "headline": "CAUTION",
+      "notes": [
+        "The owner address holds 20-30% of supply",
+        "Check not settled: privileged low-level calls, so this result is not a clean bill"
+      ],
+      "profile": "established",
+      "profile_label": "Established token",
+      "subline": "Established token.",
+      "tone": "caution"
+    },
+    "incomplete": [
+      "unclear:hidden_privileged_calls"
+    ],
+    "input_address": "0x1f9840a85d5aF5bf1D1762F925BDADdC4201F984",
+    "is_proxy": false,
+    "llm_findings": {
+      "blacklist_or_freeze": {
+        "answer": "NO",
+        "function": "",
+        "reason": "No blacklist or freeze function appears in shown code."
+      },
+      "hidden_privileged_calls": {
+        "adjusted": true,
+        "answer": "UNCLEAR",
+        "function": "",
+        "reason": "Low-level code is present (assembly 1); could not confirm it is restricted."
+      },
+      "pause_transfers": {
+        "answer": "NO",
+        "function": "",
+        "reason": "No pause controls or transfer-halting function shown."
+      },
+      "unrestricted_mint": {
+        "answer": "YES",
+        "function": "mint",
+        "reason": "Mint function increases totalSupply and credits dst balance."
+      },
+      "upgrade_without_timelock": {
+        "answer": "NO",
+        "function": "",
+        "reason": "Not a proxy; no upgrade function or markers shown."
+      }
+    },
+    "llm_parse_ok": true,
+    "llm_raw_excerpt": "{\"unrestricted_mint\":{\"answer\":\"YES\",\"function\":\"mint\",\"reason\":\"Mint function increases totalSupply and credits dst balance.\"},\"blacklist_or_freeze\":{\"answer\":\"NO\",\"function\":\"\",\"reason\":\"No blacklist or freeze function appears in shown code.\"},\"pause_transfers\":{\"answer\":\"NO\",\"function\":\"\",\"reason",
+    "market": {
+      "available": true,
+      "concentration": "LOW",
+      "flags": [
+        {
+          "code": "owner_share",
+          "level": "info",
+          "text": "The owner address holds 20-30% of supply"
+        },
+        {
+          "code": "unclear:hidden_privileged_calls",
+          "level": "info",
+          "text": "Check not settled: privileged low-level calls, so this result is not a clean bill"
+        }
+      ],
+      "graduated": null,
+      "holders": ">100k",
+      "in_contracts": "20-30%",
+      "launchpad": false,
+      "locked": "10-20%",
+      "top_wallets": "10-20%",
+      "worst": "info"
+    },
+    "profile": {
+      "age_months": null,
+      "label": "Established token",
+      "lookalike": false,
+      "profile": "established",
+      "reasons": [
+        "Reputation, holder base and contract checks all met"
+      ]
+    },
+    "proxy_type": "None",
+    "reason": "",
+    "review": {
+      "access": {
+        "blacklist_or_freeze": "none",
+        "hidden_privileged_calls": "none",
+        "pause_transfers": "none",
+        "unrestricted_mint": "gated",
+        "upgrade_without_timelock": "none"
+      },
+      "access_fns": {
+        "blacklist_or_freeze": [],
+        "hidden_privileged_calls": [],
+        "pause_transfers": [],
+        "unrestricted_mint": [
+          "setMinter",
+          "mint"
+        ],
+        "upgrade_without_timelock": []
+      },
+      "external_calls": [],
+      "flags": {
+        "assembly": 1,
+        "delegatecall": 0,
+        "selfdestruct": 0,
+        "tx.origin": 0
+      },
+      "functions_public_nonview": 8,
+      "functions_total": 31,
+      "functions_view": 4,
+      "gaps": [],
+      "gated_fns": [
+        "setMinter",
+        "mint"
+      ],
+      "library_files": 0,
+      "library_risky": [],
+      "map": "Uni.sol:setMinter[external,nonpayable|]\nUni.sol:mint[external,nonpayable|]\nUni.sol:approve[external,nonpayable|]\nUni.sol:permit[external,nonpayable|]\nUni.sol:transfer[external,nonpayable|]\nUni.sol:transferFrom[external,nonpayable|]\nUni.sol:delegate[public,nonpayable|]\nUni.sol:delegateBySig[public,nonpayable|]",
+      "map_truncated": false,
+      "open_evidence": {
+        "blacklist_or_freeze": [],
+        "hidden_privileged_calls": [],
+        "pause_transfers": [],
+        "unrestricted_mint": [],
+        "upgrade_without_timelock": []
+      },
+      "open_fns": [
+        "approve",
+        "permit",
+        "transfer",
+        "transferFrom",
+        "delegate",
+        "delegateBySig"
+      ],
+      "pause_ctrl": [],
+      "pause_gated": [],
+      "pause_gated_count": 0,
+      "payable_fns": [],
+      "project_chars": 23858,
+      "project_files": 1,
+      "risky_count": 2,
+      "risky_names": [
+        "Uni.sol:setMinter",
+        "Uni.sol:mint"
+      ],
+      "snippets": "Uni.sol:setMinter external {require(msg.sender == minter, \" \"); emit MinterChanged(minter, minter_); minter = minter_;}\nUni.sol:mint external {require(msg.sender == minter, \" \"); require(block.timestamp >= mintingAllowedAfter, \" \"); require(dst != address(0), \" \"); mintingAllowedAfter = SafeMath.add(block.timestamp, minimumTimeBetweenMints); uint96 amount = safe96(rawAmount, \" \"); require(amount <= SafeMath.div(SafeMath.mul(totalSupply, mintCap), 100), \" \"); totalSupply = safe96(SafeMath.add(totalSupply, amount), \" \"); balances[dst] = add96(balances[dst], amount, \" \"); emit Transfer(address(0), dst, amount); _moveDelegates(address(0), delegates[dst], amount);}",
+      "snippets_truncated": false,
+      "upgrade_markers": []
+    },
+    "source": "sourcify",
+    "today": "2026-10-14",
+    "verdict": "CAUTION",
+    "verified": true
+  }
+}
