@@ -1,0 +1,5 @@
+[
+  { "label": "uni-ethereum", "chainId": 1, "address": "0x1f9840a85d5aF5bf1D1762F925BDADdC4201F984", "tx": "0x3433dcfcb4673ce682426ffd0f75579a853b973b79770dd8454112b2f0a95788" },
+  { "label": "usdc-base", "chainId": 8453, "address": "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913", "tx": "0x518d28feea305213133fde8d3f6570588c8f0fbde2c704996945402231661fc9" },
+  { "label": "jup-solana", "chainId": "solana", "address": "JUPyiwrYJFskUPiHa7hkeR8VUtAeFoSYbKedZNsDvCN", "tx": "0xfb954dd05936a4e495c68ebff756f8ac6e18804d46cee17f0130346ce5424fed" }
+]
