@@ -79,10 +79,22 @@ Each of the five contract questions ends as YES, NO or UNCLEAR. Missing, malform
 | DANGER | A YES on a power that sits in an open (unrestricted) function |
 | CENTRALIZED | Two or more YES answers, all behind access checks |
 | CAUTION | One YES answer behind an access check |
-| INCONCLUSIVE | Any UNCLEAR answer, a truncated function map or source excerpt, or a failed source lookup |
+| INCONCLUSIVE | Any UNCLEAR answer, a truncated function map or source excerpt, a failed source lookup, or any gap listed under "Proxies, libraries and dependencies" |
 | CLEAR | All five checks answered NO on complete code |
 
 Incomplete analysis can never lower the severity of a real finding and can never produce CLEAR. Unavailable market data (GoPlus, RugCheck and others) is reported as "not verified", not as clean.
+
+## Proxies, libraries and dependencies
+
+The analyzer reviews the proxy's own code and up to three implementations (merged into one review). Each of these blocks CLEAR and is listed in the report as an incomplete-analysis note (`gap:` codes); none of them can lower a real finding:
+
+- a proxy whose implementation cannot be resolved (only the proxy shell is reviewed), or whose implementation has no verified source
+- more than three implementations, or a diamond-style proxy whose facets can change
+- a model answer of NO for upgrades on a proxy: the upgrade admin and any delay are not part of the analyzed code, so the answer becomes UNCLEAR
+- imported library code outside the standard vendors (OpenZeppelin, forge-std, ds-test, hardhat) that contains public functions with risky names such as mint, pause or blacklist
+- sensitive actions carried out through calls to other contracts (for example `controller.mint(...)`), where the real power sits outside the analyzed code
+
+Permissions inherited from library modifiers are recognised by modifier name (`onlyOwner`, role checks and similar).
 
 ## Tests
 
@@ -93,15 +105,23 @@ python3 tests/test_verdict_rules.py   # verdict rules and reconciliation
 python3 tests/test_adversarial.py     # unrestricted mint, blacklist, pause, unsafe upgrade, delegatecall,
                                       # malformed model output, conflicting validators, incomplete source
 python3 tests/test_market.py          # honeypot, high tax, rugged, liquidity risk, unavailable API data
+python3 tests/test_proxy_deps.py      # proxies, several implementations, library code, delegated powers
 ```
 
 ## Frontend execution check
 
-A scan is shown as successful only after the transaction is ACCEPTED or FINALIZED **and** the leader's GenVM execution result in the receipt is not an error. The page then reads the report back from the contract with `get_scan` / `get_solana_scan`. UNDETERMINED transactions and execution errors are shown as failures.
+A scan is shown as successful only after the transaction is ACCEPTED or FINALIZED **and** the leader's GenVM execution result in the receipt is a confirmed success. An error, an unknown result, or an UNDETERMINED transaction is shown as a failure and the stored report is not displayed (a stored report could belong to an older scan of the same token). `GET /api/scan/status?debug=1&hash=<tx>` shows how a transaction was judged; a screenshot for a finalized scan is in [`docs/screenshots`](docs/screenshots/status-debug-execution-success.jpg).
 
 ## Deployment and evidence
 
-Deployed contract (GenLayer Studio, `get_version` returns `"v16"`): `0xdb54C5495d3824b0A10117A7977FC4b7233eE356`
+**Reproducible evidence.** `scripts/collect-evidence.mjs` reads every transaction listed in `evidence/scans.json` from the chain (consensus status and the leader's GenVM execution result) and reads the report back from the deployed contract, writing the raw JSON to `evidence/readbacks/` and a table to `evidence/SUMMARY.md`:
+
+```bash
+npm install
+CONTRACT_ADDRESS=0x... node scripts/collect-evidence.mjs
+```
+
+**Previous deployment (v16, superseded by v17, kept for reference).** Deployed contract (GenLayer Studio, `get_version` returned `"v16"`): `0xdb54C5495d3824b0A10117A7977FC4b7233eE356` Its source is at git commit `d68fad2`.
 
 The live web app uses this same address (`CONTRACT_ADDRESS`). Each scan below was sent from the web app, reached FINALIZED with a successful GenVM execution, and was then read back from the contract with `get_scan` / `get_solana_scan`.
 
@@ -115,7 +135,7 @@ Screenshots of the live app after each scan (results rendered from the contract 
 
 ## Contract
 
-The full intelligent contract is in [`contracts/token_security_scanner_v16.py`](contracts/token_security_scanner_v16.py). To run your own copy, deploy that file to GenLayer Studio and put the deployed address in `CONTRACT_ADDRESS`. The web app in `app/` and `lib/` only relays requests to it and renders the stored result.
+The full intelligent contract is in [`contracts/token_security_scanner_v17.py`](contracts/token_security_scanner_v17.py). To run your own copy, deploy that file to GenLayer Studio and put the deployed address in `CONTRACT_ADDRESS`. The web app in `app/` and `lib/` only relays requests to it and renders the stored result.
 
 ## Contract methods
 

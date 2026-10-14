@@ -37,6 +37,10 @@ CAND_WORDS = {
                                  "changeimplementation", "setlogic"],
 }
 INIT_MODS = ["initializer", "reinitializer", "onlyinitializing"]
+EXT_RISK_WORDS = ["mint", "burn", "pause", "unpause", "blacklist", "unblacklist", "freeze",
+                  "seize", "upgrade", "setimplementation"]
+VENDOR_PREFIXES = ["forge-std/", "ds-test/", "hardhat/"]
+MAX_IMPLS = 3
 MAP_BUDGET = 8000
 SNIPPET_LIMIT = 600
 SNIPPET_BUDGET = 8000
@@ -241,6 +245,45 @@ def _analyze_header(header: str) -> dict:
     return {"vis": vis, "mut": mut, "mods": mods, "privileged": privileged}
 
 
+def _external_risk_calls(body: str) -> list:
+    """Calls like `controller.mint(` made on another contract. The real power
+    then sits outside the analyzed code. super./this. calls are not external."""
+    found = []
+    low = body.lower()
+    for word in EXT_RISK_WORDS:
+        start = 0
+        while True:
+            i = low.find("." + word, start)
+            if i < 0:
+                break
+            start = i + 1
+            j = i + 1 + len(word)
+            while j < len(low) and _is_ident(low[j]):
+                j += 1
+            if j >= len(low) or low[j] != "(":
+                continue
+            k = i
+            while k > 0 and _is_ident(low[k - 1]):
+                k -= 1
+            owner = low[k:i]
+            if owner in ["", "super", "this", "address"]:
+                continue
+            tag = owner + "." + low[i + 1:j]
+            if tag not in found:
+                found.append(tag)
+    return found[:4]
+
+
+def _is_vendor_library(name: str) -> bool:
+    low = name.lower()
+    if "openzeppelin" in low:
+        return True
+    for prefix in VENDOR_PREFIXES:
+        if low.startswith(prefix):
+            return True
+    return False
+
+
 def _build_review(sources: dict) -> dict:
     names = sorted(list(sources.keys()))
     project_files = 0
@@ -263,6 +306,8 @@ def _build_review(sources: dict) -> dict:
     pause_gated = []
     pause_ctrl = []
     recs = []
+    library_risky = []
+    external_calls = []
 
     for nm in names:
         low = nm.lower()
@@ -271,6 +316,19 @@ def _build_review(sources: dict) -> dict:
                 markers.append(mk)
         if _is_library_path(nm):
             library_files += 1
+            if not _is_vendor_library(nm):
+                lentry = sources[nm]
+                lcontent = str(lentry.get("content", "")) if isinstance(lentry, dict) else str(lentry)
+                for lfn in _parse_functions(_strip_comments(lcontent)):
+                    linfo = _analyze_header(lfn["header"])
+                    if linfo["vis"] not in ["external", "public"] or linfo["mut"] in ["view", "pure"]:
+                        continue
+                    for rw in RISK_WORDS:
+                        if rw in lfn["name"].lower():
+                            tag = nm.split("/")[-1] + ":" + lfn["name"]
+                            if tag not in library_risky:
+                                library_risky.append(tag)
+                            break
             continue
         project_files += 1
         entry = sources[nm]
@@ -288,6 +346,10 @@ def _build_review(sources: dict) -> dict:
             info = _analyze_header(fn["header"])
             body_sp = _compact(fn["body"]).lower()
             bodyc = body_sp.replace(" ", "")
+            for ext in _external_risk_calls(body_sp):
+                tag = fn["name"] + "->" + ext
+                if tag not in external_calls:
+                    external_calls.append(tag)
             recs.append({
                 "name": fn["name"],
                 "pub": info["vis"] in ["external", "public"] and info["mut"] not in ["view", "pure"],
@@ -433,6 +495,8 @@ def _build_review(sources: dict) -> dict:
         "map_truncated": map_truncated,
         "snippets": "\n".join(snippets),
         "snippets_truncated": snippets_truncated,
+        "library_risky": library_risky[:10],
+        "external_calls": external_calls[:10],
     }
 
 
@@ -493,7 +557,7 @@ def _fetch_json(url: str) -> dict:
 
 def _proxy_info(data: dict) -> dict:
     pr = data.get("proxyResolution")
-    info = {"is_proxy": False, "proxy_type": "", "impl": ""}
+    info = {"is_proxy": False, "proxy_type": "", "impl": "", "impls": []}
     if isinstance(pr, dict):
         info["is_proxy"] = bool(pr.get("isProxy", False))
         info["proxy_type"] = str(pr.get("proxyType", ""))
@@ -501,9 +565,19 @@ def _proxy_info(data: dict) -> dict:
         if isinstance(impls, list):
             for item in impls:
                 if isinstance(item, dict) and "address" in item:
-                    info["impl"] = str(item["address"])
-                    break
+                    info["impls"].append(str(item["address"]))
+        if len(info["impls"]) > 0:
+            info["impl"] = info["impls"][0]
     return info
+
+
+def _merge_sources(base: dict, extra: dict, tag: str) -> None:
+    """Add extra source files to base. A name clash with different content keeps both."""
+    for nm in extra.keys():
+        if nm not in base:
+            base[nm] = extra[nm]
+        elif json.dumps(base[nm], sort_keys=True) != json.dumps(extra[nm], sort_keys=True):
+            base[nm + "#" + tag] = extra[nm]
 
 
 def _analyze_address(chain_id: int, address: str) -> dict:
@@ -535,32 +609,45 @@ def _analyze_address(chain_id: int, address: str) -> dict:
     sources1 = data1.get("sources")
     has_sources1 = isinstance(sources1, dict) and len(sources1) > 0
 
-    target_data = data1
-    target_sources = sources1
-    has_target_sources = has_sources1
-
-    if proxy["is_proxy"] and proxy["impl"] != "":
-        result["analyzed_address"] = proxy["impl"]
-        r2 = _fetch_json(_sourcify_url(chain_id, proxy["impl"]))
-        if r2["ok"]:
-            data2 = r2["data"]
-            sources2 = data2.get("sources")
-            has_sources2 = isinstance(sources2, dict) and len(sources2) > 0
-            if has_sources2:
-                target_data = data2
-                target_sources = sources2
-                has_target_sources = True
+    gaps = []
+    merged = {}
+    if proxy["is_proxy"]:
+        ptype = proxy["proxy_type"].lower()
+        impls = proxy["impls"]
+        if len(impls) == 0:
+            gaps.append("proxy_implementation_unresolved")
+        if len(impls) > MAX_IMPLS:
+            gaps.append("many_implementations")
+        if "diamond" in ptype:
+            gaps.append("diamond_facets_can_change")
+        got_impl = False
+        for n, impl_addr in enumerate(impls[:MAX_IMPLS]):
+            r2 = _fetch_json(_sourcify_url(chain_id, impl_addr))
+            src2 = r2["data"].get("sources") if r2["ok"] else None
+            if isinstance(src2, dict) and len(src2) > 0:
+                _merge_sources(merged, src2, "i" + str(n))
+                got_impl = True
             else:
-                has_target_sources = False
-        else:
-            has_target_sources = False
-
-    if not has_target_sources:
-        result["reason"] = "no_sources"
-        return result
+                gaps.append("implementation_not_verified")
+        if len(impls) > 0:
+            result["analyzed_address"] = impls[0]
+        if has_sources1:
+            _merge_sources(merged, sources1, "p")
+        if not got_impl:
+            if len(impls) > 0 or not has_sources1:
+                result["reason"] = "no_sources"
+                return result
+            gaps.append("only_proxy_code_analyzed")
+    else:
+        if not has_sources1:
+            result["reason"] = "no_sources"
+            return result
+        merged = sources1
 
     result["verified"] = True
-    result["review"] = _shape_review(_build_review(target_sources))
+    review = _shape_review(_build_review(merged))
+    review["gaps"] = gaps
+    result["review"] = review
     return result
 
 
@@ -590,6 +677,9 @@ def _shape_review(rev: dict) -> dict:
         "map_truncated": rev["map_truncated"],
         "snippets": rev["snippets"],
         "snippets_truncated": rev["snippets_truncated"],
+        "library_risky": rev["library_risky"],
+        "external_calls": rev["external_calls"],
+        "gaps": [],
     }
 
 
@@ -851,6 +941,21 @@ BUNDLE_WIDE_FILES = 30
 CRITICAL_CATEGORIES = ["unrestricted_mint", "upgrade_without_timelock", "hidden_privileged_calls"]
 
 
+def _reconcile_proxy(findings: dict, is_proxy: bool) -> dict:
+    """A proxy can be re-pointed by whoever holds its admin key, and that key is not
+    part of the analyzed code. A model answer of NO for upgrades is not trusted."""
+    if is_proxy is not True or not isinstance(findings, dict):
+        return findings
+    up = findings.get("upgrade_without_timelock")
+    if isinstance(up, dict) and up.get("answer") == "NO":
+        fixed = dict(findings)
+        fixed["upgrade_without_timelock"] = dict(
+            up, answer="UNCLEAR", adjusted=True,
+            reason="This contract is a proxy, so its logic can be replaced; the upgrade admin and any delay are not visible in the analyzed code.")
+        return fixed
+    return findings
+
+
 def _bundle_wide(review) -> bool:
     """True when the verified source covers a whole multi-contract system.
     Function evidence then cannot be attributed to the token being scanned."""
@@ -858,6 +963,21 @@ def _bundle_wide(review) -> bool:
         return False
     n = review.get("project_files", 0)
     return isinstance(n, int) and n > BUNDLE_WIDE_FILES
+
+
+def _analysis_gaps(review) -> list:
+    """Reasons the analyzed code may not hold the whole picture (proxy shapes, hidden
+    library code, powers delegated to other contracts). Any of them blocks CLEAR."""
+    out = []
+    if not isinstance(review, dict):
+        return out
+    for g in review.get("gaps") or []:
+        out.append(str(g))
+    if review.get("library_risky"):
+        out.append("library_risky_functions")
+    if review.get("external_calls"):
+        out.append("external_dependency_calls")
+    return out
 
 
 def _compute_verdict(findings: dict, review: dict = None) -> str:
@@ -890,6 +1010,8 @@ def _compute_verdict(findings: dict, review: dict = None) -> str:
         return "INCONCLUSIVE"
     if isinstance(review, dict) and (review.get("map_truncated") or review.get("snippets_truncated")):
         return "INCONCLUSIVE"
+    if isinstance(review, dict) and _analysis_gaps(review):
+        return "INCONCLUSIVE"
     return "CLEAR"
 
 
@@ -905,6 +1027,8 @@ def _incomplete_reasons(findings: dict, review: dict, parse_ok: bool) -> list:
             out.append("snippets_truncated")
     if _bundle_wide(review):
         out.append("bundle_wide")
+    for g in _analysis_gaps(review):
+        out.append("gap:" + g)
     for cat in RISK_CATEGORIES:
         if findings.get(cat, {}).get("answer") not in ["YES", "NO"]:
             out.append("unclear:" + cat)
@@ -2911,6 +3035,13 @@ INCOMPLETE_TEXT = {
     "snippets_truncated": "Part of the contract's code was too large to include, so the review may be incomplete",
     "bundle_wide": "The verified source covers a multi-contract system, so findings cannot be tied to this token alone; an unrestricted function found there is reported as inconclusive, not as danger",
     "source_lookup_failed": "The source code lookup failed, so the contract was not reviewed; this says nothing about the contract itself",
+    "gap:proxy_implementation_unresolved": "This is a proxy and its implementation could not be resolved, so the real logic was not reviewed",
+    "gap:many_implementations": "This proxy points to many implementations; only the first few were reviewed",
+    "gap:diamond_facets_can_change": "This is a diamond-style proxy whose facets can be changed, so today's code is not the whole picture",
+    "gap:implementation_not_verified": "At least one implementation behind this proxy has no verified source and was not reviewed",
+    "gap:only_proxy_code_analyzed": "Only the proxy's own code could be reviewed, not the logic behind it",
+    "gap:library_risky_functions": "Imported library code outside the standard vendors contains functions with risky names (minting, pausing, blacklisting and similar) that were not analyzed",
+    "gap:external_dependency_calls": "Some sensitive actions are carried out by calls to other contracts, so the real power may sit outside the analyzed code",
 }
 INCOMPLETE_CATEGORY = {
     "unrestricted_mint": "minting power",
@@ -3050,6 +3181,7 @@ class TokenSecurityScanner(gl.Contract):
         analysis["llm_parse_ok"] = parse_ok
         analysis["llm_raw_excerpt"] = str(raw_llm)[:300]
         findings = _reconcile_findings(findings, review)
+        findings = _reconcile_proxy(findings, analysis["is_proxy"])
         analysis["llm_findings"] = findings
         analysis["verdict"] = _compute_verdict(findings, review)
         analysis["incomplete"] = _incomplete_reasons(findings, review, parse_ok)
@@ -3126,7 +3258,7 @@ class TokenSecurityScanner(gl.Contract):
 
     @gl.public.view
     def get_version(self) -> str:
-        return "v16"
+        return "v17"
 
     @gl.public.write
     def scan_pasted_code(self, chain_id: int, address: str, pasted_code: str) -> None:

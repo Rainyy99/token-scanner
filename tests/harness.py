@@ -3,7 +3,7 @@ Nothing here touches the network."""
 import json, os, sys, types
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-CONTRACT = os.path.join(ROOT, "contracts", "token_security_scanner_v16.py")
+CONTRACT = os.path.join(ROOT, "contracts", "token_security_scanner_v17.py")
 
 ROUTES = []          # (url substring, factory(url) -> response)
 LLM = {"raw": "{}", "raise": None}
